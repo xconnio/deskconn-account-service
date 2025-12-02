@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Deskconn Backend"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["sqlalchemy", "aiosqlite", "python-dotenv"]
 readme = "README.md"
 
 [project.optional-dependencies]
