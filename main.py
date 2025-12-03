@@ -1,10 +1,19 @@
-import asyncio
+from xconn import App
+from xconn.app import ExecutionMode
 
 from deskconn.database import database
+from deskconn.api.user import component as user_component
 
 
-async def main():
+app = App()
+app.set_execution_mode(ExecutionMode.ASYNC)
+
+
+async def on_startup():
     await database.init_db()
 
 
-asyncio.run(main())
+app.add_event_handler("startup", on_startup)
+
+app.include_component(user_component)
+app.set_schema_procedure("io.xconn.deskconn.account.schema.get")

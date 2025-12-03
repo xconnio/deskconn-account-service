@@ -21,3 +21,6 @@ test:
 
 clean:
 	rm -rf *.egg-info build
+
+run:
+	./.venv/bin/xcorn main:app --realm io.xconn.deskconn --url ws://localhost:8080/ws

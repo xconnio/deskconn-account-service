@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from deskconn.models import Base
 
@@ -21,3 +21,8 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def get_database() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        yield session
