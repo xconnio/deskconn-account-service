@@ -28,3 +28,15 @@ class CRAUser(UserGet):
     authrole: str = helpers.ROLE_USER
     iterations: int = helpers.ITERATIONS
     key_length: int = helpers.KEY_LENGTH
+
+
+class DeviceCreate(BaseModel):
+    device_id: str
+    public_key: str
+    name: str | None = None
+
+
+class DeviceGet(DeviceCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
