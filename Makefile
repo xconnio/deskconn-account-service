@@ -1,4 +1,13 @@
 .PHONY: setup
+-include .env
+export $(shell sed 's/=.*//' .env 2>/dev/null || true)
+
+REQUIRED_VARS = DESKCONN_ACCOUNT_AUTHID DESKCONN_ACCOUNT_PRIVATE_KEY
+
+# check for missing or empty envs
+define check_defined
+    @: $(foreach v,$(1),$(if $(filter-out "",$(strip $($(v)))),,$(error Missing or empty environment variable: $(v))))
+endef
 
 install_uv:
 	@if ! command -v uv >/dev/null 2>&1; then \
@@ -6,6 +15,7 @@ install_uv:
   	fi
 
 setup:
+	cp example.env .env
 	make install_uv
 	uv venv
 	uv pip install .[test] -U
@@ -23,4 +33,9 @@ clean:
 	rm -rf *.egg-info build
 
 run:
-	./.venv/bin/xcorn main:app --realm io.xconn.deskconn --url ws://localhost:8080/ws
+	$(call check_defined,$(REQUIRED_VARS))
+	./.venv/bin/xcorn main:app \
+		--realm io.xconn.deskconn \
+		--url ws://localhost:8080/ws \
+		--authid $(DESKCONN_ACCOUNT_AUTHID) \
+		--private-key $(DESKCONN_ACCOUNT_PRIVATE_KEY)
