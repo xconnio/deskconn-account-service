@@ -1,0 +1,35 @@
+from xconn import Component
+from xconn.exception import ApplicationError
+from sqlalchemy.ext.asyncio import AsyncSession
+from xconn.types import Depends, CallDetails
+
+from deskconn import schemas, uris
+from deskconn.database.database import get_database
+from deskconn.database.backend import user as user_backend
+from deskconn.database.backend import device as device_backend
+
+component = Component()
+
+
+@component.register("io.xconn.deskconn.device.create", response_model=schemas.DeviceGet)
+async def create(rs: schemas.DeviceCreate, details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    if await device_backend.device_exists_by_keys(db, rs):
+        raise ApplicationError(
+            uris.ERROR_DEVICE_EXISTS,
+            f"Device with public key '{rs.public_key}' or device_id '{rs.device_id}' already exists",
+        )
+
+    return await device_backend.create_device(db, rs, db_user)
+
+
+@component.register("io.xconn.deskconn.device.key.list", response_model=schemas.DeviceGet)
+async def list_public_keys(details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    return await device_backend.get_user_public_keys(db, db_user.id)
