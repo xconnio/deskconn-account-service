@@ -13,10 +13,7 @@ async def create_user(db: AsyncSession, data: schemas.UserCreate) -> models.User
     if db_user.role == models.UserRole.guest:
         db_user.is_verified = True
     else:
-        otp = helpers.generate_email_otp()
-        db_user.otp_hash = helpers.hash_otp(otp)
-        db_user.otp_expires_at = helpers.otp_expiry_time()
-        helpers.send_user_verification_email(db_user.email, otp)
+        await generate_and_save_otp(db, db_user)
 
     db.add(db_user)
     await db.commit()
@@ -42,3 +39,10 @@ async def get_user_by_email(db: AsyncSession, email: str) -> models.User | None:
 async def verify_user(db: AsyncSession, db_user: models.User) -> None:
     db_user.is_verified = True
     await db.commit()
+
+
+async def generate_and_save_otp(db: AsyncSession, db_user: models.User) -> models.User:
+    db_user.otp_hash, db_user.otp_expires_at = helpers.generate_and_send_otp(db_user.email)
+    await db.commit()
+
+    return db_user

@@ -4,6 +4,7 @@ import secrets
 import hashlib
 import smtplib
 import threading
+from typing import Tuple
 from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
 
@@ -58,6 +59,15 @@ def otp_expiry_time() -> datetime:
     return datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
 
 
+def generate_and_send_otp(email: str) -> Tuple[str, datetime]:
+    otp = generate_email_otp()
+    otp_hash = hash_otp(otp)
+    otp_expires_at = otp_expiry_time()
+    send_user_verification_email(email, otp)
+
+    return otp_hash, otp_expires_at
+
+
 def verify_email_otp(stored_hash: str | None, expires_at: datetime | None, provided_code: str) -> bool:
     if stored_hash is None or expires_at is None:
         return False
@@ -77,7 +87,7 @@ def send_user_verification_email(user_email: str, code: str) -> None:
 
 
 def send_email(user_email: str, code: str) -> None:
-    msg = MIMEText(f"Your verification code is: '{code}'")
+    msg = MIMEText(f"Your verification code is: {code}")
     msg["Subject"] = "Deskconn Verification Code"
     msg["From"] = DESKCONN_EMAIL
     msg["To"] = user_email
