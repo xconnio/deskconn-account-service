@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Enum, Integer, ForeignKey, Text, DateTime
+from sqlalchemy import Enum, Integer, ForeignKey, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship, declarative_base, mapped_column
 
 from deskconn import helpers
@@ -22,6 +22,9 @@ class User(Base):
     name = mapped_column(Text, nullable=False)
     salt = mapped_column(Text)
     role = mapped_column(Enum(UserRole, name="user_role"), nullable=False, default=UserRole.guest)
+    otp_hash = mapped_column(Text)
+    otp_expires_at = mapped_column(DateTime(timezone=True))
+    is_verified = mapped_column(Boolean, default=False)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
