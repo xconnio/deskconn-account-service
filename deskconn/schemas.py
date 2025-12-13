@@ -14,6 +14,11 @@ class UserCreate(User):
     password: str
 
 
+class UserVerify(BaseModel):
+    email: str
+    code: str
+
+
 class UserGet(User):
     model_config = ConfigDict(from_attributes=True)
 

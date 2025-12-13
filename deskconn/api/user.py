@@ -28,11 +28,29 @@ async def get(details: CallDetails, db: AsyncSession = Depends(get_database)):
     return db_user
 
 
+@component.register("io.xconn.deskconn.account.verify")
+async def account_verification(rs: schemas.UserVerify, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, rs.email)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
+
+    if db_user.is_verified:
+        raise ApplicationError(uris.ERROR_USER_ALREADY_VERIFIED, "User is already verified")
+
+    if not helpers.verify_email_otp(db_user.otp_hash, db_user.otp_expires_at, rs.code):
+        raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+
+    await user_backend.verify_user(db, db_user)
+
+
 @component.register("io.xconn.deskconn.account.cra.verify", response_model=schemas.CRAUser)
 async def verify_cra(authid: str, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, authid)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{authid}' not found")
+
+    if not db_user.is_verified:
+        raise ApplicationError(uris.ERROR_USER_NOT_VERIFIED, f"User with authid '{authid}' is not verified")
 
     return db_user
 
@@ -42,6 +60,9 @@ async def verify_cryptosign(authid: str, public_key: str, db: AsyncSession = Dep
     db_user = await user_backend.get_user_by_email(db, authid)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{authid}' not found")
+
+    if not db_user.is_verified:
+        raise ApplicationError(uris.ERROR_USER_NOT_VERIFIED, f"User with authid '{authid}' is not verified")
 
     db_device = await device_backend.get_device_by_public_key(db, public_key, db_user.id)
     if db_device is None:
