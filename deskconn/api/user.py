@@ -43,6 +43,18 @@ async def account_verification(rs: schemas.UserVerify, db: AsyncSession = Depend
     await user_backend.verify_user(db, db_user)
 
 
+@component.register("io.xconn.deskconn.account.otp.resend")
+async def otp_resend(email: str, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, email)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{email}' not found")
+
+    if db_user.is_verified:
+        raise ApplicationError(uris.ERROR_USER_ALREADY_VERIFIED, "User is already verified")
+
+    await user_backend.generate_and_save_otp(db, db_user)
+
+
 @component.register("io.xconn.deskconn.account.cra.verify", response_model=schemas.CRAUser)
 async def verify_cra(authid: str, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, authid)
