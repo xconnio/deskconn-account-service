@@ -33,6 +33,12 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+def hash_password_and_generate_salt(password: str) -> Tuple[str, str]:
+    salt = generate_salt()
+
+    return hash_password(password, salt), salt
+
+
 def hash_password(password: str, salt: str) -> str:
     return derive_cra_key(salt, password, ITERATIONS, KEY_LENGTH).decode()
 

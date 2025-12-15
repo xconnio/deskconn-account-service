@@ -25,6 +25,12 @@ class UserGet(User):
     id: int
 
 
+class PasswordReset(BaseModel):
+    email: str
+    password: str
+    code: str
+
+
 class CRAUser(UserGet):
     model_config = ConfigDict(from_attributes=True)
 
