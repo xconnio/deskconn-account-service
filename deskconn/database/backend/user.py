@@ -5,8 +5,7 @@ from deskconn import models, schemas, helpers
 
 
 async def create_user(db: AsyncSession, data: schemas.UserCreate) -> models.User:
-    salt = helpers.generate_salt()
-    data.password = helpers.hash_password(data.password, salt)
+    data.password, salt = helpers.hash_password_and_generate_salt(data.password)
     db_user = models.User(**data.model_dump(), salt=salt)
 
     # guest users are allowed to call the APIs
@@ -43,6 +42,13 @@ async def verify_user(db: AsyncSession, db_user: models.User) -> None:
 
 async def generate_and_save_otp(db: AsyncSession, db_user: models.User) -> models.User:
     db_user.otp_hash, db_user.otp_expires_at = helpers.generate_and_send_otp(db_user.email)
+    await db.commit()
+
+    return db_user
+
+
+async def reset_password(db: AsyncSession, db_user: models.User, new_password: str) -> models.User:
+    db_user.password, db_user.salt = helpers.hash_password_and_generate_salt(new_password)
     await db.commit()
 
     return db_user

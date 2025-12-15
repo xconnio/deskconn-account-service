@@ -49,10 +49,28 @@ async def otp_resend(email: str, db: AsyncSession = Depends(get_database)):
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{email}' not found")
 
-    if db_user.is_verified:
-        raise ApplicationError(uris.ERROR_USER_ALREADY_VERIFIED, "User is already verified")
+    await user_backend.generate_and_save_otp(db, db_user)
+
+
+@component.register("io.xconn.deskconn.account.password.forget")
+async def forget_password(email: str, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, email)
+    if db_user is None:
+        return None
 
     await user_backend.generate_and_save_otp(db, db_user)
+
+
+@component.register("io.xconn.deskconn.account.password.reset")
+async def reset_password(rs: schemas.PasswordReset, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, rs.email)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
+
+    if not helpers.verify_email_otp(db_user.otp_hash, db_user.otp_expires_at, rs.code):
+        raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+
+    await user_backend.reset_password(db, db_user, rs.password)
 
 
 @component.register("io.xconn.deskconn.account.cra.verify", response_model=schemas.CRAUser)
