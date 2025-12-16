@@ -14,6 +14,13 @@ class UserCreate(User):
     password: str
 
 
+class UserUpgrade(BaseModel):
+    old_email: str
+    email: str
+    password: str
+    name: str | None = None
+
+
 class UserVerify(BaseModel):
     email: str
     code: str

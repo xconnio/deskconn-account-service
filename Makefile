@@ -18,7 +18,7 @@ setup:
 	cp example.env .env
 	make install_uv
 	uv venv
-	uv pip install .[test] -U
+	uv pip install -e .[test] -U
 
 format:
 	./.venv/bin/ruff format .
