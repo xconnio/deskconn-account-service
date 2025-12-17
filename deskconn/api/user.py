@@ -1,4 +1,4 @@
-from xconn import Component
+from xconn import Component, uris as xconn_uris
 from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from xconn.types import Depends, CallDetails, Result
@@ -26,6 +26,28 @@ async def get(details: CallDetails, db: AsyncSession = Depends(get_database)):
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
     return db_user
+
+
+@component.register("io.xconn.deskconn.account.update", response_model=schemas.UserGet)
+async def update(rs: schemas.UserUpdate, details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    data = rs.model_dump(exclude_none=True)
+    if len(data) == 0:
+        raise ApplicationError(xconn_uris.ERROR_INVALID_ARGUMENT, "No field to update")
+
+    return await user_backend.update_user(db, db_user, data)
+
+
+@component.register("io.xconn.deskconn.account.delete")
+async def delete(details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    await user_backend.delete_user(db, db_user)
 
 
 @component.register("io.xconn.deskconn.account.verify")

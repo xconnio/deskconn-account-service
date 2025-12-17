@@ -32,6 +32,12 @@ class UserGet(User):
     id: int
 
 
+class UserUpdate(BaseModel):
+    name: str | None = None
+    password: str | None = None
+
+
+
 class PasswordReset(BaseModel):
     email: str
     password: str
