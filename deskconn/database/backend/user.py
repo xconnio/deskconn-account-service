@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from deskconn import models, schemas, helpers
@@ -15,6 +15,21 @@ async def create_user(db: AsyncSession, data: schemas.UserCreate) -> models.User
         await generate_and_save_otp(db, db_user)
 
     db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+
+    return db_user
+
+
+async def guest_upgrade(db: AsyncSession, db_user: models.User, data: schemas.UserUpgrade) -> models.User:
+    db_user.name = data.name
+    db_user.email = data.email
+    db_user.password, db_user.salt = helpers.hash_password_and_generate_salt(data.password)
+    db_user.role = models.UserRole.user
+    db_user.is_verified = False
+
+    await generate_and_save_otp(db, db_user)
+
     await db.commit()
     await db.refresh(db_user)
 
@@ -52,3 +67,10 @@ async def reset_password(db: AsyncSession, db_user: models.User, new_password: s
     await db.commit()
 
     return db_user
+
+
+async def user_exists(db: AsyncSession, email: str) -> bool:
+    stmt = select(exists().where(models.User.email == email))
+    result = await db.execute(stmt)
+
+    return bool(result.scalar())
