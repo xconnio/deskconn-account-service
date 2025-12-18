@@ -1,8 +1,9 @@
+from uuid import UUID
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, UUID4, PlainSerializer, StringConstraints
 
-from deskconn import helpers
+from deskconn import helpers, models
 from deskconn.models import UserRole
 
 # serialize UUID as string for JSON responses
@@ -53,7 +54,6 @@ class UserUpdate(BaseModel):
     password: str | None = None
 
 
-
 class PasswordReset(BaseModel):
     email: str
     password: str
@@ -100,4 +100,42 @@ class DesktopDelete(BaseModel):
 
 class DesktopUpdate(DesktopDelete):
     public_key: PublicKeyHex | None = None
+    name: str | None = None
+
+
+class OrganizationMemberGet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: int
+    role: models.OrganizationRole
+    all_desktops: bool
+    user: UserGet
+
+
+class OrganizationMemberList(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    name: str
+
+    owner: UserGet
+    members: list[OrganizationMemberGet] = []
+
+
+class OrganizationCreate(BaseModel):
+    name: str
+
+
+class OrganizationGet(OrganizationCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+
+
+class OrganizationDelete(BaseModel):
+    organization_id: UUID
+
+
+class OrganizationUpdate(OrganizationDelete):
+    organization_id: UUID
     name: str | None = None
