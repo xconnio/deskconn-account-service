@@ -16,8 +16,8 @@ async def create_desktop(db: AsyncSession, data: schemas.DesktopCreate, user: mo
     return db_desktop
 
 
-async def desktop_exists_by_desktop_id(db: AsyncSession, desktop_id: str) -> bool:
-    stmt = select(exists().where(models.Desktop.desktop_id == desktop_id))
+async def desktop_exists_by_authid(db: AsyncSession, authid: str) -> bool:
+    stmt = select(exists().where(models.Desktop.authid == authid))
     result = await db.execute(stmt)
 
     return bool(result.scalar())
@@ -52,3 +52,10 @@ async def update_desktop(db: AsyncSession, db_desktop: models.Desktop, data: dic
 async def delete_desktop(db: AsyncSession, db_desktop: models.Desktop) -> None:
     await db.delete(db_desktop)
     await db.commit()
+
+
+async def get_desktop_by_public_key(db: AsyncSession, authid: str, public_key: str) -> models.Device | None:
+    stmt = select(models.Desktop).where(models.Desktop.authid == authid).where(models.Desktop.public_key == public_key)
+    result = await db.execute(stmt)
+
+    return result.scalar()

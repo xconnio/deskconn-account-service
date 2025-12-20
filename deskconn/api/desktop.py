@@ -17,8 +17,8 @@ async def create(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    if await desktop_backend.desktop_exists_by_desktop_id(db, rs.desktop_id):
-        raise ApplicationError(uris.ERROR_DESKTOP_EXISTS, f"Desktop with device id '{rs.desktop_id}' already exists")
+    if await desktop_backend.desktop_exists_by_authid(db, rs.authid):
+        raise ApplicationError(uris.ERROR_DESKTOP_EXISTS, f"Desktop with device id '{rs.authid}' already exists")
 
     return await desktop_backend.create_desktop(db, rs, db_user)
 

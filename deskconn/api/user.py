@@ -1,12 +1,11 @@
 from xconn import Component, uris as xconn_uris
 from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from xconn.types import Depends, CallDetails, Result
+from xconn.types import Depends, CallDetails
 
 from deskconn import schemas, uris, helpers, models
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
-from deskconn.database.backend import device as device_backend
 
 component = Component()
 
@@ -110,31 +109,3 @@ async def guest_upgrade(rs: schemas.UserUpgrade, db: AsyncSession = Depends(get_
         raise ApplicationError(uris.ERROR_USER_EXISTS, f"User with email '{rs.email}' already exists")
 
     return await user_backend.guest_upgrade(db, db_user, rs)
-
-
-@component.register("io.xconn.deskconn.account.cra.verify", response_model=schemas.CRAUser)
-async def verify_cra(authid: str, db: AsyncSession = Depends(get_database)):
-    db_user = await user_backend.get_user_by_email(db, authid)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{authid}' not found")
-
-    if not db_user.is_verified:
-        raise ApplicationError(uris.ERROR_USER_NOT_VERIFIED, f"User with authid '{authid}' is not verified")
-
-    return db_user
-
-
-@component.register("io.xconn.deskconn.account.cryptosign.verify")
-async def verify_cryptosign(authid: str, public_key: str, db: AsyncSession = Depends(get_database)):
-    db_user = await user_backend.get_user_by_email(db, authid)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{authid}' not found")
-
-    if not db_user.is_verified:
-        raise ApplicationError(uris.ERROR_USER_NOT_VERIFIED, f"User with authid '{authid}' is not verified")
-
-    db_device = await device_backend.get_device_by_public_key(db, public_key, db_user.id)
-    if db_device is None:
-        raise ApplicationError(uris.ERROR_DEVICE_NOT_FOUND, f"Device with public key '{public_key}' not found")
-
-    return Result(args=[{"authid": authid, "authrole": helpers.ROLE_USER}])

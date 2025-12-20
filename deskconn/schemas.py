@@ -83,7 +83,7 @@ class DeviceGet(DeviceCreate):
 
 
 class DesktopCreate(BaseModel):
-    desktop_id: str
+    authid: str
     public_key: PublicKeyHex
     name: str | None = None
 

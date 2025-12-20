@@ -52,7 +52,7 @@ class Desktop(Base):
     __tablename__ = "desktops"
 
     id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
-    desktop_id = mapped_column(Text, unique=True, nullable=False)
+    authid = mapped_column(Text, unique=True, nullable=False)
     name = mapped_column(Text)
     public_key = mapped_column(Text, nullable=False, index=True)
 
