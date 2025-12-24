@@ -1,4 +1,6 @@
-from sqlalchemy import select, exists
+from typing import Any
+
+from sqlalchemy import select, exists, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from deskconn import models, schemas, helpers
@@ -19,6 +21,33 @@ async def create_user(db: AsyncSession, data: schemas.UserCreate) -> models.User
     await db.refresh(db_user)
 
     return db_user
+
+
+async def update_user(db: AsyncSession, db_user: models.User, data: dict[str, Any]) -> models.User:
+    for field, value in data.items():
+        if field == "password":
+            db_user.password, db_user.salt = helpers.hash_password_and_generate_salt(value)
+            continue
+
+        if hasattr(db_user, field):
+            setattr(db_user, field, value)
+
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+
+    return db_user
+
+
+async def delete_user(db: AsyncSession, db_user: models.User) -> None:
+    await delete_user_devices(db, db_user)
+    await db.delete(db_user)
+    await db.commit()
+
+
+async def delete_user_devices(db: AsyncSession, db_user: models.User) -> None:
+    stmt = delete(models.Device).where(models.Device.user_id == db_user.id)
+    await db.execute(stmt)
 
 
 async def guest_upgrade(db: AsyncSession, db_user: models.User, data: schemas.UserUpgrade) -> models.User:
