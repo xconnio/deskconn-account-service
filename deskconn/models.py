@@ -1,6 +1,7 @@
 import enum
+import uuid
 
-from sqlalchemy import Enum, Integer, ForeignKey, Text, DateTime, Boolean
+from sqlalchemy import Enum, Integer, ForeignKey, Text, DateTime, Boolean, UUID
 from sqlalchemy.orm import relationship, declarative_base, mapped_column
 
 from deskconn import helpers
@@ -45,14 +46,13 @@ class Device(Base):
     user_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     user = relationship("User", back_populates="devices", passive_deletes=True)
-    desktops = relationship("Desktop", back_populates="device", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Desktop(Base):
     __tablename__ = "desktops"
 
-    id = mapped_column(Integer, primary_key=True)
-    desktop_id = mapped_column(Text, unique=True, nullable=False)
+    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    authid = mapped_column(Text, unique=True, nullable=False)
     name = mapped_column(Text)
     public_key = mapped_column(Text, nullable=False, index=True)
 
@@ -60,6 +60,3 @@ class Desktop(Base):
 
     user_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user = relationship("User", back_populates="desktops", passive_deletes=True)
-
-    device_id = mapped_column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True)
-    device = relationship("Device", back_populates="desktops", passive_deletes=True)
