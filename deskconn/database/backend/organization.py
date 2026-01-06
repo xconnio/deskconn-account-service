@@ -1,11 +1,12 @@
 from typing import Any
 from uuid import UUID
+from datetime import timedelta
 
 from sqlalchemy import select, Sequence, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from deskconn import models, schemas
+from deskconn import models, schemas, helpers
 
 
 async def create_organization(
@@ -15,9 +16,7 @@ async def create_organization(
 ) -> models.Organization:
     db_organization = models.Organization(name=data.name, owner_id=user.id)
 
-    db_organization.members.append(
-        models.OrganizationMember(user_id=user.id, role=models.OrganizationRole.owner, all_desktops=True)
-    )
+    db_organization.members.append(models.OrganizationMember(user_id=user.id, role=models.OrganizationRole.owner))
 
     db.add(db_organization)
     await db.commit()
@@ -84,3 +83,100 @@ async def get_organization_by_id(db: AsyncSession, organization_id: UUID) -> mod
     result = await db.execute(stmt)
 
     return result.scalar()
+
+
+async def get_organization_membership(
+    db: AsyncSession, organization_id: UUID, db_user: models.User
+) -> models.OrganizationMember | None:
+    stmt = select(models.OrganizationMember).where(
+        models.OrganizationMember.organization_id == organization_id,
+        models.OrganizationMember.user_id == db_user.id,
+    )
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
+async def create_invite(
+    db: AsyncSession,
+    user: models.User,
+    organization: models.Organization,
+    data: schemas.OrganizationInviteCreate,
+    invitee: models.User,
+) -> models.OrganizationInvite:
+    db_org_invitation = models.OrganizationInvite(
+        inviter_id=user.id,
+        organization_id=organization.id,
+        role=data.role,
+        status=models.InvitationStatus.pending,
+        expires_at=helpers.utcnow() + timedelta(hours=data.expires_in_hours),
+        invitee_id=invitee.id,
+    )
+
+    db.add(db_org_invitation)
+    await db.commit()
+    await db.refresh(db_org_invitation)
+
+    helpers.send_organization_invite_email(user.email, invitee.email)
+
+    return db_org_invitation
+
+
+async def get_organization_invitation(
+    db: AsyncSession, organization_id: UUID, invitee_id: int
+) -> models.OrganizationInvite | None:
+    stmt = select(models.OrganizationInvite).where(
+        models.OrganizationInvite.organization_id == organization_id,
+        models.OrganizationInvite.invitee_id == invitee_id,
+        models.OrganizationInvite.expires_at > helpers.utcnow(),
+    )
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
+async def get_organization_invitation_by_id(db: AsyncSession, invitation_id: UUID) -> models.OrganizationInvite | None:
+    stmt = select(models.OrganizationInvite).where(models.OrganizationInvite.id == invitation_id)
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
+async def change_invitation_status(
+    db: AsyncSession, invitation: models.OrganizationInvite, status: models.InvitationStatus
+) -> None:
+    invitation.status = status
+    await db.commit()
+
+
+async def respond_to_invitation(
+    db: AsyncSession, invitation: models.OrganizationInvite, status: models.InvitationStatus
+) -> models.OrganizationMember | None:
+    await change_invitation_status(db, invitation, status)
+
+    if status == models.InvitationStatus.accepted:
+        db_organization_member = models.OrganizationMember(
+            role=invitation.role,
+            organization_id=invitation.organization_id,
+            user_id=invitation.invitee_id,
+        )
+
+        db.add(db_organization_member)
+        await db.commit()
+        await db.refresh(db_organization_member)
+
+        return db_organization_member
+
+
+async def list_inbox_invitation(db: AsyncSession, user: models.User) -> Sequence[models.OrganizationInvite]:
+    stmt = select(models.OrganizationInvite).where(models.OrganizationInvite.invitee_id == user.id)
+
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+async def list_outbox_invitation(db: AsyncSession, user: models.User) -> Sequence[models.OrganizationInvite]:
+    stmt = select(models.OrganizationInvite).where(models.OrganizationInvite.inviter_id == user.id)
+
+    result = await db.execute(stmt)
+    return result.scalars().all()

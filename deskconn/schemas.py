@@ -1,7 +1,8 @@
+from datetime import datetime
 from uuid import UUID
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, UUID4, PlainSerializer, StringConstraints
+from pydantic import BaseModel, ConfigDict, UUID4, PlainSerializer, StringConstraints, Field, EmailStr
 
 from deskconn import helpers, models
 from deskconn.models import UserRole
@@ -9,6 +10,7 @@ from deskconn.models import UserRole
 # serialize UUID as string for JSON responses
 UUIDStr = Annotated[UUID4, PlainSerializer(lambda v: str(v), return_type=str)]
 
+DateTimeStr = Annotated[datetime, PlainSerializer(lambda v: v.isoformat(), return_type=str)]
 PublicKeyHex = Annotated[
     str,
     StringConstraints(
@@ -108,7 +110,6 @@ class OrganizationMemberGet(BaseModel):
 
     user_id: int
     role: models.OrganizationRole
-    all_desktops: bool
     user: UserGet
 
 
@@ -139,3 +140,38 @@ class OrganizationDelete(BaseModel):
 class OrganizationUpdate(OrganizationDelete):
     organization_id: UUID
     name: str | None = None
+
+
+AllowedInviteRoles = Literal[
+    models.OrganizationRole.admin,
+    models.OrganizationRole.member,
+]
+
+
+class OrganizationInviteCreate(BaseModel):
+    organization_id: UUID
+    email: EmailStr
+    role: AllowedInviteRoles
+    expires_in_hours: int = Field(default=72, ge=1, le=168)
+
+
+class OrganizationInviteGet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    organization_id: UUIDStr
+    role: models.OrganizationRole
+    status: models.InvitationStatus
+    expires_at: DateTimeStr
+    created_at: DateTimeStr
+
+
+OrganizationRespondStatus = Literal[
+    models.InvitationStatus.accepted,
+    models.InvitationStatus.rejected,
+]
+
+
+class OrganizationInviteRespond(BaseModel):
+    invitation_id: UUID4
+    status: OrganizationRespondStatus
