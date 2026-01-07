@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID
 from typing import Annotated, Literal
@@ -105,6 +107,20 @@ class DesktopDelete(BaseModel):
 class DesktopUpdate(DesktopDelete):
     public_key: PublicKeyHex | None = None
     name: str | None = None
+
+
+class DesktopAccessGrant(BaseModel):
+    id: UUID4
+    user_id: int
+    role: AllowedInviteRoles
+
+
+class DesktopAccessGet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    desktop_id: UUIDStr
+    created_at: DateTimeStr
 
 
 class OrganizationMemberGet(BaseModel):

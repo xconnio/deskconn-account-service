@@ -69,3 +69,38 @@ async def detach(rs: schemas.DesktopDelete, details: CallDetails, db: AsyncSessi
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"Desktop with id '{rs.id}' not found")
 
     await desktop_backend.delete_desktop(db, db_desktop)
+
+
+@component.register("io.xconn.deskconn.desktop.access.grant", response_model=schemas.DesktopAccessGet)
+async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: AsyncSession = Depends(get_database)):
+    inviter = await user_backend.get_user_by_email(db, details.authid)
+    if inviter is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    invitee = await user_backend.get_user_by_id(db, rs.user_id)
+    if invitee is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with id '{rs.user_id}' not found")
+
+    if inviter.id == invitee.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot access grant to yourself")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.id)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.id}' not found")
+
+    db_organization_membership = await organization_backend.get_organization_membership(
+        db, db_desktop.organization_id, invitee
+    )
+    if db_organization_membership is None:
+        raise ApplicationError(
+            uris.ERROR_ORGANIZATION_NOT_FOUND,
+            f"Membership for organization with uuid '{db_desktop.organization_id}' not found",
+        )
+
+    if db_organization_membership.organization.owner_id != inviter.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "User is not authorized to access this organization")
+
+    if await desktop_backend.desktop_access_exists(db, db_desktop.id, db_organization_membership.id):
+        raise ApplicationError(uris.ERROR_USER_ALREADY_MEMBER, "User already has access to this desktop")
+
+    return await desktop_backend.grant_access_to_desktop(db, db_desktop.id, db_organization_membership.id, rs)

@@ -176,12 +176,12 @@ class DesktopAccess(Base):
     __tablename__ = "desktop_access"
 
     id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
 
     member_id = mapped_column(
         UUID, ForeignKey("organization_members.id", ondelete="CASCADE"), nullable=False, index=True
     )
-
-    desktop_id = mapped_column(Integer, ForeignKey("desktops.id", ondelete="CASCADE"), nullable=False, index=True)
+    desktop_id = mapped_column(UUID, ForeignKey("desktops.id", ondelete="CASCADE"), nullable=False, index=True)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
