@@ -85,6 +85,13 @@ async def get_organization_by_id(db: AsyncSession, organization_id: UUID) -> mod
     return result.scalar()
 
 
+async def get_owner_organization_by_id(db: AsyncSession, organization_id: UUID, user_id: int) -> models.Organization | None:
+    stmt = select(models.Organization).where(models.Organization.id == organization_id).where(models.Organization.owner_id == user_id)
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
 async def get_organization_membership(
     db: AsyncSession, organization_id: UUID, db_user: models.User
 ) -> models.OrganizationMember | None:

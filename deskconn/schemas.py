@@ -87,6 +87,7 @@ class DeviceGet(DeviceCreate):
 class DesktopCreate(BaseModel):
     authid: str
     public_key: PublicKeyHex
+    organization_id: UUID4
     name: str | None = None
 
 
@@ -94,6 +95,7 @@ class DesktopGet(DesktopCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUIDStr
+    organization_id: UUIDStr
 
 
 class DesktopDelete(BaseModel):
