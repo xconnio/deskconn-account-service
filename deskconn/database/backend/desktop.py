@@ -86,3 +86,10 @@ async def grant_access_to_desktop(
     await db.refresh(db_desktop_access)
 
     return db_desktop_access
+
+
+async def get_desktop_by_authid(db: AsyncSession, desktop_authid: str) -> models.Desktop:
+    stmt = select(models.Desktop).where(models.Desktop.authid == desktop_authid)
+    result = await db.execute(stmt)
+
+    return result.scalar()
