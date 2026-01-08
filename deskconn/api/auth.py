@@ -8,6 +8,7 @@ from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import device as device_backend
 from deskconn.database.backend import desktop as desktop_backend
+from deskconn.database.backend import organization as organization_backend
 
 component = Component()
 
@@ -46,3 +47,24 @@ async def verify_cryptosign(authid: str, public_key: str, db: AsyncSession = Dep
         authrole = helpers.ROLE_DESKTOP
 
     return Result(args=[{"authid": authid, "authrole": authrole}])
+
+
+@component.register("io.xconn.deskconn.desktop.access")
+async def desktop_access(authid: str, desktop_authid: str, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{authid}' not found")
+
+    if not db_user.is_verified:
+        raise ApplicationError(uris.ERROR_USER_NOT_VERIFIED, f"User with authid '{authid}' is not verified")
+
+    db_desktop = await desktop_backend.get_desktop_by_authid(db, desktop_authid)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DEVICE_NOT_FOUND, f"Desktop with authid '{desktop_authid}' not found")
+
+    if await organization_backend.get_organization_membership(db, db_desktop.organization_id, db_user) is None:
+        raise ApplicationError(
+            uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
+        )
+
+    return None

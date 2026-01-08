@@ -89,19 +89,27 @@ def verify_email_otp(stored_hash: str | None, expires_at: datetime | None, provi
 
 
 def send_user_verification_email(user_email: str, code: str) -> None:
-    thread = threading.Thread(target=send_email, args=(user_email, code))
-    thread.start()
-
-
-def send_email(user_email: str, code: str) -> None:
     msg = MIMEText(f"Your verification code is: {code}")
     msg["Subject"] = "Deskconn Verification Code"
     msg["From"] = DESKCONN_EMAIL
     msg["To"] = user_email
+    thread = threading.Thread(target=send_email, args=(msg,))
+    thread.start()
 
+
+def send_email(msg: MIMEText) -> None:
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(DESKCONN_EMAIL, DESKCONN_PASSWORD)
             server.send_message(msg)
     except Exception as e:
         print("Failed to send email, reason:", e)
+
+
+def send_organization_invite_email(inviter: str, invitee: str):
+    msg = MIMEText(f"You have been invited to join the {inviter}'s organization.")
+    msg["Subject"] = "Organization Invitation"
+    msg["From"] = DESKCONN_EMAIL
+    msg["To"] = invitee
+    thread = threading.Thread(target=send_email, args=(msg,))
+    thread.start()

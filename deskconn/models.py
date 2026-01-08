@@ -24,6 +24,7 @@ class InvitationStatus(str, enum.Enum):
     pending = "pending"
     accepted = "accepted"
     rejected = "rejected"
+    expired = "expired"
 
 
 class User(Base):
@@ -42,6 +43,7 @@ class User(Base):
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
     devices = relationship("Device", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    desktops = relationship("Desktop", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
 
     organization_memberships = relationship(
         "OrganizationMember",
@@ -58,10 +60,17 @@ class User(Base):
         passive_deletes=True,
     )
 
-    organization_invites = relationship(
+    inviter = relationship(
         "OrganizationInvite",
-        back_populates="user",
+        back_populates="inviter",
         passive_deletes=True,
+        foreign_keys="OrganizationInvite.inviter_id",
+    )
+    invitee = relationship(
+        "OrganizationInvite",
+        back_populates="invitee",
+        passive_deletes=True,
+        foreign_keys="OrganizationInvite.invitee_id",
     )
 
 
@@ -167,12 +176,12 @@ class DesktopAccess(Base):
     __tablename__ = "desktop_access"
 
     id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
 
     member_id = mapped_column(
         UUID, ForeignKey("organization_members.id", ondelete="CASCADE"), nullable=False, index=True
     )
-
-    desktop_id = mapped_column(Integer, ForeignKey("desktops.id", ondelete="CASCADE"), nullable=False, index=True)
+    desktop_id = mapped_column(UUID, ForeignKey("desktops.id", ondelete="CASCADE"), nullable=False, index=True)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
@@ -184,7 +193,6 @@ class OrganizationInvite(Base):
     __tablename__ = "organization_invites"
 
     id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
-    email = mapped_column(Text, nullable=False, index=True)
     role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
     status = mapped_column(
         Enum(InvitationStatus, name="invitation_status"), nullable=False, default=InvitationStatus.pending.value
@@ -192,20 +200,16 @@ class OrganizationInvite(Base):
 
     accepted_at = mapped_column(DateTime(timezone=True))
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
+    expires_at = mapped_column(DateTime(timezone=True), nullable=False)
 
     organization_id = mapped_column(
-        UUID,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        UUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
     )
     organization = relationship("Organization", back_populates="invites")
 
     # Filled once invite is accepted or user exists in database
-    user_id = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    user = relationship("User", back_populates="organization_invites")
+    inviter_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    inviter = relationship("User", foreign_keys=[inviter_id], back_populates="inviter")
+
+    invitee_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    invitee = relationship("User", foreign_keys=[invitee_id], back_populates="invitee")

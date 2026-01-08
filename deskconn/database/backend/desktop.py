@@ -37,6 +37,13 @@ async def get_user_desktop_by_id(db: AsyncSession, desktop_id: UUID, db_user: mo
     return result.scalar()
 
 
+async def get_desktop_by_id(db: AsyncSession, desktop_id: UUID) -> models.Desktop:
+    stmt = select(models.Desktop).where(models.Desktop.id == desktop_id)
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
 async def update_desktop(db: AsyncSession, db_desktop: models.Desktop, data: dict[str, Any]) -> models.Desktop:
     for field, value in data.items():
         if hasattr(db_desktop, field):
@@ -56,6 +63,33 @@ async def delete_desktop(db: AsyncSession, db_desktop: models.Desktop) -> None:
 
 async def get_desktop_by_public_key(db: AsyncSession, authid: str, public_key: str) -> models.Device | None:
     stmt = select(models.Desktop).where(models.Desktop.authid == authid).where(models.Desktop.public_key == public_key)
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
+async def desktop_access_exists(db: AsyncSession, desktop_id: UUID, member_id: UUID) -> bool:
+    stmt = select(
+        exists().where(models.DesktopAccess.desktop_id == desktop_id).where(models.DesktopAccess.member_id == member_id)
+    )
+    result = await db.execute(stmt)
+
+    return bool(result.scalar())
+
+
+async def grant_access_to_desktop(
+    db: AsyncSession, desktop_id: UUID, member_id: UUID, data: schemas.DesktopAccessGrant
+) -> models.DesktopAccess:
+    db_desktop_access = models.DesktopAccess(desktop_id=desktop_id, member_id=member_id, role=data.role)
+    db.add(db_desktop_access)
+    await db.commit()
+    await db.refresh(db_desktop_access)
+
+    return db_desktop_access
+
+
+async def get_desktop_by_authid(db: AsyncSession, desktop_authid: str) -> models.Desktop:
+    stmt = select(models.Desktop).where(models.Desktop.authid == desktop_authid)
     result = await db.execute(stmt)
 
     return result.scalar()
