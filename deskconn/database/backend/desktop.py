@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, exists, Sequence
+from sqlalchemy import select, exists, Sequence, delete
 
 from deskconn import models, schemas
 
@@ -61,6 +61,7 @@ async def update_desktop(db: AsyncSession, db_desktop: models.Desktop, data: dic
 
 
 async def delete_desktop(db: AsyncSession, db_desktop: models.Desktop) -> None:
+    await remove_desktop_access(db, db_desktop.id)
     await db.delete(db_desktop)
     await db.commit()
 
@@ -97,3 +98,8 @@ async def get_desktop_by_authid(db: AsyncSession, desktop_authid: str) -> models
     result = await db.execute(stmt)
 
     return result.scalar()
+
+
+async def remove_desktop_access(db: AsyncSession, desktop_id: UUID) -> None:
+    stmt = delete(models.DesktopAccess).where(models.DesktopAccess.desktop_id == desktop_id)
+    await db.execute(stmt)
