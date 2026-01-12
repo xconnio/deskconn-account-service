@@ -61,7 +61,7 @@ async def delete_desktop(db: AsyncSession, db_desktop: models.Desktop) -> None:
     await db.commit()
 
 
-async def get_desktop_by_public_key(db: AsyncSession, authid: str, public_key: str) -> models.Device | None:
+async def get_desktop_by_public_key(db: AsyncSession, authid: str, public_key: str) -> models.Desktop | None:
     stmt = select(models.Desktop).where(models.Desktop.authid == authid).where(models.Desktop.public_key == public_key)
     result = await db.execute(stmt)
 

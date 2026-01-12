@@ -62,7 +62,15 @@ async def desktop_access(authid: str, desktop_authid: str, db: AsyncSession = De
     if db_desktop is None:
         raise ApplicationError(uris.ERROR_DEVICE_NOT_FOUND, f"Desktop with authid '{desktop_authid}' not found")
 
-    if await organization_backend.get_organization_membership(db, db_desktop.organization_id, db_user) is None:
+    db_org_membership = await organization_backend.get_organization_membership(
+        db, db_desktop.organization_id, db_user
+    )
+    if db_org_membership is None:
+        raise ApplicationError(
+            uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
+        )
+
+    if not await desktop_backend.desktop_access_exists(db, db_desktop.id, db_org_membership.id):
         raise ApplicationError(
             uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
         )

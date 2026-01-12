@@ -67,7 +67,7 @@ async def update(
         )
 
     if db_organization.owner_id != db_user.id:
-        raise ApplicationError(uris.ERROR_USER_NO_AUTHORIZED, "User not authorized to delete organization")
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "User not authorized to delete organization")
 
     data = rs.model_dump(exclude_none=True)
     if len(data) == 0:
