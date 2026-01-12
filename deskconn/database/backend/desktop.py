@@ -7,11 +7,15 @@ from sqlalchemy import select, exists, Sequence
 from deskconn import models, schemas
 
 
-async def create_desktop(db: AsyncSession, data: schemas.DesktopCreate, user: models.User) -> models.Desktop:
+async def create_desktop(
+    db: AsyncSession, data: schemas.DesktopCreate, user: models.User, org_membership: models.OrganizationMember
+) -> models.Desktop:
     db_desktop = models.Desktop(**data.model_dump(), user_id=user.id)
     db.add(db_desktop)
     await db.commit()
     await db.refresh(db_desktop)
+
+    await grant_access_to_desktop(db, db_desktop.id, org_membership.id, models.OrganizationRole.owner)
 
     return db_desktop
 
@@ -78,9 +82,9 @@ async def desktop_access_exists(db: AsyncSession, desktop_id: UUID, member_id: U
 
 
 async def grant_access_to_desktop(
-    db: AsyncSession, desktop_id: UUID, member_id: UUID, data: schemas.DesktopAccessGrant
+    db: AsyncSession, desktop_id: UUID, member_id: UUID, role: models.OrganizationRole
 ) -> models.DesktopAccess:
-    db_desktop_access = models.DesktopAccess(desktop_id=desktop_id, member_id=member_id, role=data.role)
+    db_desktop_access = models.DesktopAccess(desktop_id=desktop_id, member_id=member_id, role=role)
     db.add(db_desktop_access)
     await db.commit()
     await db.refresh(db_desktop_access)

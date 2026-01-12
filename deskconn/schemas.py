@@ -111,7 +111,7 @@ class DesktopUpdate(DesktopDelete):
 
 class DesktopAccessGrant(BaseModel):
     id: UUID4
-    user_id: int
+    invitee: EmailStr
     role: AllowedInviteRoles
 
 

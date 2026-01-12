@@ -28,7 +28,11 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
             f"Organization with uuid '{rs.organization_id}' not found",
         )
 
-    return await desktop_backend.create_desktop(db, rs, db_user)
+    db_organization_membership = await organization_backend.get_organization_membership(db, rs.organization_id, db_user)
+    if db_organization_membership is None:
+        raise ApplicationError(uris.ERROR_INTERNAL_ERROR, "Organization membership not found")
+
+    return await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership)
 
 
 @component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)
@@ -77,9 +81,9 @@ async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: Async
     if inviter is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    invitee = await user_backend.get_user_by_id(db, rs.user_id)
+    invitee = await user_backend.get_user_by_email(db, str(rs.invitee))
     if invitee is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with id '{rs.user_id}' not found")
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.user_id}' not found")
 
     if inviter.id == invitee.id:
         raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot access grant to yourself")
@@ -103,4 +107,4 @@ async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: Async
     if await desktop_backend.desktop_access_exists(db, db_desktop.id, db_organization_membership.id):
         raise ApplicationError(uris.ERROR_USER_ALREADY_MEMBER, "User already has access to this desktop")
 
-    return await desktop_backend.grant_access_to_desktop(db, db_desktop.id, db_organization_membership.id, rs)
+    return await desktop_backend.grant_access_to_desktop(db, db_desktop.id, db_organization_membership.id, rs.role)
