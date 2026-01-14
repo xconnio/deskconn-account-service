@@ -8,11 +8,13 @@ from deskconn import models, schemas
 
 
 async def create_desktop(
-    db: AsyncSession, data: schemas.DesktopCreate, user: models.User, org_membership: models.OrganizationMember
+    db: AsyncSession,
+    data: schemas.DesktopCreate,
+    user: models.User,
+    org_membership: models.OrganizationMember,
+    realm: str,
 ) -> models.Desktop:
-    db_desktop = models.Desktop(
-        **data.model_dump(), user_id=user.id, realm=f"io.xconn.deskconn.{org_membership.organization_id}.{data.authid}"
-    )
+    db_desktop = models.Desktop(**data.model_dump(), user_id=user.id, realm=realm)
     db.add(db_desktop)
     await db.commit()
     await db.refresh(db_desktop)

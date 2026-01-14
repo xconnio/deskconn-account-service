@@ -32,7 +32,19 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     if db_organization_membership is None:
         raise ApplicationError(uris.ERROR_INTERNAL_ERROR, "Organization membership not found")
 
-    return await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership)
+    realm = f"io.xconn.deskconn.{db_organization_membership.organization_id}.{rs.authid}"
+
+    # call router rpc to add realm
+    try:
+        await component.session.call("io.xconn.deskconn.realm.add", [realm])
+    except ApplicationError as app_err:
+        raise ApplicationError(
+            uris.ERROR_INTERNAL_ERROR, f"Got error upon creating realm for desktop. Error is: {app_err.args}"
+        )
+    except Exception as err:
+        raise ApplicationError(uris.ERROR_INTERNAL_ERROR, str(err))
+
+    return await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
 
 
 @component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)
