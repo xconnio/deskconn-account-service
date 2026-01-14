@@ -98,6 +98,7 @@ class DesktopGet(DesktopCreate):
 
     id: UUIDStr
     organization_id: UUIDStr
+    realm: str
 
 
 class DesktopDelete(BaseModel):
