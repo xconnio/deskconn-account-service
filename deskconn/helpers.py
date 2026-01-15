@@ -2,12 +2,11 @@ import os
 import base64
 import secrets
 import hashlib
-import smtplib
 import threading
 from typing import Tuple
-from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
 
+import resend
 from dotenv import load_dotenv
 from wampproto.auth.wampcra import derive_cra_key
 
@@ -21,13 +20,12 @@ ROLE_DESKTOP = "desktop"
 OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 5
 
-DESKCONN_EMAIL = os.getenv("DESKCONN_EMAIL", None)
-if DESKCONN_EMAIL is None or DESKCONN_EMAIL == "":
-    raise ValueError("'DESKCONN_EMAIL' missing in environment variables.")
 
-DESKCONN_PASSWORD = os.getenv("DESKCONN_PASSWORD", None)
-if DESKCONN_PASSWORD is None or DESKCONN_PASSWORD == "":
-    raise ValueError("'DESKCONN_PASSWORD' missing in environment variables.")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", None)
+if RESEND_API_KEY is None or RESEND_API_KEY == "":
+    raise ValueError("'RESEND_API_KEY' missing in environment variables.")
+
+resend.api_key = RESEND_API_KEY
 
 
 def utcnow():
@@ -89,27 +87,31 @@ def verify_email_otp(stored_hash: str | None, expires_at: datetime | None, provi
 
 
 def send_user_verification_email(user_email: str, code: str) -> None:
-    msg = MIMEText(f"Your verification code is: {code}")
-    msg["Subject"] = "Deskconn Verification Code"
-    msg["From"] = DESKCONN_EMAIL
-    msg["To"] = user_email
-    thread = threading.Thread(target=send_email, args=(msg,))
+    params: resend.Emails.SendParams = {
+        "from": "XConnIO <noreply@xconn.io>",
+        "to": [user_email],
+        "subject": "Deskconn Verification Code",
+        "text": f"Your verification code is: {code}",
+    }
+
+    thread = threading.Thread(target=send_email, args=(params,))
     thread.start()
 
 
-def send_email(msg: MIMEText) -> None:
+def send_email(params: resend.Emails.SendParams) -> None:
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(DESKCONN_EMAIL, DESKCONN_PASSWORD)
-            server.send_message(msg)
+        resend.Emails.send(params)
     except Exception as e:
         print("Failed to send email, reason:", e)
 
 
 def send_organization_invite_email(inviter: str, invitee: str):
-    msg = MIMEText(f"You have been invited to join the {inviter}'s organization.")
-    msg["Subject"] = "Organization Invitation"
-    msg["From"] = DESKCONN_EMAIL
-    msg["To"] = invitee
-    thread = threading.Thread(target=send_email, args=(msg,))
+    params: resend.Emails.SendParams = {
+        "from": "XConnIO <noreply@xconn.io>",
+        "to": [invitee],
+        "subject": "Organization Invitation",
+        "text": f"You have been invited to join the {inviter}'s organization.",
+    }
+
+    thread = threading.Thread(target=send_email, args=(params,))
     thread.start()
