@@ -3,13 +3,16 @@ from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from xconn.types import Depends, CallDetails
 
-from deskconn import schemas, uris
+from deskconn import schemas, uris, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import desktop as desktop_backend
 from deskconn.database.backend import organization as organization_backend
 
 component = Component()
+
+PROCEDURE_ADD_REALM = "io.xconn.deskconn.realm.add"
+PROCEDURE_REMOVE_REALM = "io.xconn.deskconn.realm.remove"
 
 
 @component.register("io.xconn.deskconn.desktop.attach", response_model=schemas.DesktopGet)
@@ -35,14 +38,7 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     realm = f"io.xconn.deskconn.{db_organization_membership.organization_id}.{rs.authid}"
 
     # call router rpc to add realm
-    try:
-        await component.session.call("io.xconn.deskconn.realm.add", [realm])
-    except ApplicationError as app_err:
-        raise ApplicationError(
-            uris.ERROR_INTERNAL_ERROR, f"Got error upon creating realm for desktop. Error is: {app_err.args}"
-        )
-    except Exception as err:
-        raise ApplicationError(uris.ERROR_INTERNAL_ERROR, str(err))
+    await helpers.call_cloud_router_rpc(component.session, PROCEDURE_ADD_REALM, [realm])
 
     return await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
 
@@ -83,6 +79,9 @@ async def detach(rs: schemas.DesktopDelete, details: CallDetails, db: AsyncSessi
     db_desktop = await desktop_backend.get_user_desktop_by_id(db, rs.id, db_user)
     if db_desktop is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"Desktop with id '{rs.id}' not found")
+
+    # call router rpc to remove realm
+    await helpers.call_cloud_router_rpc(component.session, PROCEDURE_REMOVE_REALM, [db_desktop.realm])
 
     await desktop_backend.delete_desktop(db, db_desktop)
 
