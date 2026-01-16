@@ -3,12 +3,16 @@ import base64
 import secrets
 import hashlib
 import threading
-from typing import Tuple
+from typing import Tuple, Any
 from datetime import datetime, timezone, timedelta
 
 import resend
 from dotenv import load_dotenv
+from xconn.exception import ApplicationError
+from xconn.async_session import AsyncSession
 from wampproto.auth.wampcra import derive_cra_key
+
+from deskconn import uris
 
 load_dotenv()
 
@@ -115,3 +119,14 @@ def send_organization_invite_email(inviter: str, invitee: str):
 
     thread = threading.Thread(target=send_email, args=(params,))
     thread.start()
+
+
+async def call_cloud_router_rpc(session: AsyncSession, uri: str, args: list[Any]):
+    try:
+        await session.call(uri, args)
+    except ApplicationError as app_err:
+        raise ApplicationError(
+            uris.ERROR_INTERNAL_ERROR, f"Got error upon deleting realm for desktop. Error is: {app_err.args}"
+        )
+    except Exception as err:
+        raise ApplicationError(uris.ERROR_INTERNAL_ERROR, str(err))
