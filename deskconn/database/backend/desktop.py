@@ -32,7 +32,14 @@ async def desktop_exists_by_authid(db: AsyncSession, authid: str) -> bool:
 
 
 async def get_user_desktops(db: AsyncSession, user_id: int) -> Sequence[models.Desktop]:
-    stmt = select(models.Desktop).where(models.Desktop.user_id == user_id)
+    stmt = (
+        select(models.Desktop)
+        .join(models.Desktop.accesses)
+        .join(models.DesktopAccess.member)
+        .where(models.OrganizationMember.user_id == user_id)
+        .distinct()
+    )
+
     result = await db.execute(stmt)
 
     return result.scalars().all()
