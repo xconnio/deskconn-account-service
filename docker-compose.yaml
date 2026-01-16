@@ -1,0 +1,9 @@
+services:
+  deskconn-account:
+    container_name: deskconn-account-container
+    image: "xconnio/deskconn-account:latest"
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
