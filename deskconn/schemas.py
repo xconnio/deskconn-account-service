@@ -101,11 +101,12 @@ class DesktopGet(DesktopCreate):
     realm: str
 
 
-class DesktopDelete(BaseModel):
+class DesktopDetach(BaseModel):
+    authid: str
+
+
+class DesktopUpdate(BaseModel):
     id: UUID4
-
-
-class DesktopUpdate(DesktopDelete):
     public_key: PublicKeyHex | None = None
     name: str | None = None
 

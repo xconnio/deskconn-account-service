@@ -71,14 +71,17 @@ async def update(rs: schemas.DesktopUpdate, details: CallDetails, db: AsyncSessi
 
 
 @component.register("io.xconn.deskconn.desktop.detach")
-async def detach(rs: schemas.DesktopDelete, details: CallDetails, db: AsyncSession = Depends(get_database)):
+async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    db_desktop = await desktop_backend.get_user_desktop_by_id(db, rs.id, db_user)
+    db_desktop = await desktop_backend.get_desktop_by_authid(db, rs.authid)
     if db_desktop is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"Desktop with id '{rs.id}' not found")
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"Desktop with authid '{rs.authid}' not found")
+
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot detach a desktop from another user")
 
     # call router rpc to remove realm
     await helpers.call_cloud_router_rpc(component.session, PROCEDURE_REMOVE_REALM, [db_desktop.realm])
