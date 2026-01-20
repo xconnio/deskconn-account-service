@@ -1,9 +1,12 @@
 from typing import Any
 
-from sqlalchemy import select, exists, delete
+from sqlalchemy import select, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from deskconn import models, schemas, helpers
+from deskconn.database.backend import device as device_backend
+from deskconn.database.backend import desktop as desktop_backend
+from deskconn.database.backend import organization as organization_backend
 
 
 async def create_user(db: AsyncSession, data: schemas.UserCreate) -> models.User:
@@ -40,14 +43,15 @@ async def update_user(db: AsyncSession, db_user: models.User, data: dict[str, An
 
 
 async def delete_user(db: AsyncSession, db_user: models.User) -> None:
-    await delete_user_devices(db, db_user)
+    await desktop_backend.delete_user_desktop_access(db, db_user)
+    await organization_backend.delete_user_invites(db, db_user)
+    await organization_backend.delete_user_memberships(db, db_user)
+    await desktop_backend.delete_user_desktops(db, db_user)
+    await organization_backend.delete_user_organizations(db, db_user)
+    await device_backend.delete_user_devices(db, db_user)
+
     await db.delete(db_user)
     await db.commit()
-
-
-async def delete_user_devices(db: AsyncSession, db_user: models.User) -> None:
-    stmt = delete(models.Device).where(models.Device.user_id == db_user.id)
-    await db.execute(stmt)
 
 
 async def guest_upgrade(db: AsyncSession, db_user: models.User, data: schemas.UserUpgrade) -> models.User:

@@ -114,3 +114,14 @@ async def get_desktop_by_authid(db: AsyncSession, desktop_authid: str) -> models
 async def remove_desktop_access(db: AsyncSession, desktop_id: UUID) -> None:
     stmt = delete(models.DesktopAccess).where(models.DesktopAccess.desktop_id == desktop_id)
     await db.execute(stmt)
+
+
+async def delete_user_desktop_access(db: AsyncSession, db_user: models.User) -> None:
+    subq = select(models.OrganizationMember.id).where(models.OrganizationMember.user_id == db_user.id)
+    stmt = delete(models.DesktopAccess).where(models.DesktopAccess.member_id.in_(subq))
+    await db.execute(stmt)
+
+
+async def delete_user_desktops(db: AsyncSession, db_user: models.User) -> None:
+    stmt = delete(models.Desktop).where(models.Desktop.user_id == db_user.id)
+    await db.execute(stmt)

@@ -2,9 +2,9 @@ from typing import Any
 from uuid import UUID
 from datetime import timedelta
 
-from sqlalchemy import select, Sequence, delete
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, Sequence, delete, or_
 
 from deskconn import models, schemas, helpers
 
@@ -197,3 +197,23 @@ async def list_outbox_invitation(db: AsyncSession, user: models.User) -> Sequenc
 
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+async def delete_user_organizations(db: AsyncSession, db_user: models.User) -> None:
+    stmt = delete(models.Organization).where(models.Organization.owner_id == db_user.id)
+    await db.execute(stmt)
+
+
+async def delete_user_memberships(db: AsyncSession, db_user: models.User) -> None:
+    stmt = delete(models.OrganizationMember).where(models.OrganizationMember.user_id == db_user.id)
+    await db.execute(stmt)
+
+
+async def delete_user_invites(db: AsyncSession, db_user: models.User) -> None:
+    stmt = delete(models.OrganizationInvite).where(
+        or_(
+            models.OrganizationInvite.inviter_id == db_user.id,
+            models.OrganizationInvite.invitee_id == db_user.id,
+        )
+    )
+    await db.execute(stmt)

@@ -97,7 +97,7 @@ async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: Async
 
     invitee = await user_backend.get_user_by_email(db, str(rs.invitee))
     if invitee is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.user_id}' not found")
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.invitee}' not found")
 
     if inviter.id == invitee.id:
         raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot access grant to yourself")
