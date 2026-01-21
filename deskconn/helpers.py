@@ -24,6 +24,7 @@ ROLE_DESKTOP = "xconnio:deskconn:desktop:{authid}"
 OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 5
 
+CLOUD_REALM = "io.xconn.deskconn"
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", None)
 if RESEND_API_KEY is None or RESEND_API_KEY == "":

@@ -111,6 +111,13 @@ async def get_desktop_by_authid(db: AsyncSession, desktop_authid: str) -> models
     return result.scalar()
 
 
+async def get_desktop_by_realm(db: AsyncSession, realm: str) -> models.Desktop:
+    stmt = select(models.Desktop).where(models.Desktop.realm == realm)
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
 async def remove_desktop_access(db: AsyncSession, desktop_id: UUID) -> None:
     stmt = delete(models.DesktopAccess).where(models.DesktopAccess.desktop_id == desktop_id)
     await db.execute(stmt)
