@@ -20,7 +20,7 @@ ITERATIONS = 1000
 KEY_LENGTH = 32
 
 ROLE_USER = "user"
-ROLE_DESKTOP = "desktop"
+ROLE_DESKTOP = "xconnio:deskconn:desktop:{authid}"
 OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 5
 
