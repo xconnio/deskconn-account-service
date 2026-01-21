@@ -93,7 +93,7 @@ def verify_email_otp(stored_hash: str | None, expires_at: datetime | None, provi
 
 def send_user_verification_email(user_email: str, code: str) -> None:
     params: resend.Emails.SendParams = {
-        "from": "XConnIO <noreply@xconn.io>",
+        "from": "Deskconn <noreply@deskconn.com>",
         "to": [user_email],
         "subject": "Deskconn Verification Code",
         "text": f"Your verification code is: {code}",
@@ -112,7 +112,7 @@ def send_email(params: resend.Emails.SendParams) -> None:
 
 def send_organization_invite_email(inviter: str, invitee: str):
     params: resend.Emails.SendParams = {
-        "from": "XConnIO <noreply@xconn.io>",
+        "from": "Deskconn <noreply@deskconn.com>",
         "to": [invitee],
         "subject": "Organization Invitation",
         "text": f"You have been invited to join the {inviter}'s organization.",
