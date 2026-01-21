@@ -44,7 +44,7 @@ async def verify_cryptosign(authid: str, public_key: str, db: AsyncSession = Dep
                 uris.ERROR_DEVICE_NOT_FOUND, f"Desktop with authid '{authid}' public key '{public_key}' not found"
             )
 
-        authrole = helpers.ROLE_DESKTOP
+        authrole = helpers.ROLE_DESKTOP.format(authid=db_desktop.authid)
 
     return Result(args=[{"authid": authid, "authrole": authrole}])
 
