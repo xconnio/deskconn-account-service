@@ -107,7 +107,7 @@ class Desktop(Base):
         nullable=False,
         index=True,
     )
-    realm = mapped_column(Text, nullable=False)
+    realm = mapped_column(Text, nullable=False, unique=True)
 
     organization = relationship("Organization", back_populates="desktops")
     accesses = relationship(
