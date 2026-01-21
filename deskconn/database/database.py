@@ -22,6 +22,8 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    await engine.dispose()
+
 
 async def get_database() -> AsyncSession:
     async with AsyncSessionLocal() as session:
