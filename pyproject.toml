@@ -15,6 +15,7 @@ dependencies = [
     "pydantic[email]",
     "resend",
     "python-dateutil",
+    "alembic",
 ]
 readme = "README.md"
 
@@ -24,6 +25,10 @@ test = [
   "pytest",
   "pytest-asyncio",
 ]
+
+[tool.setuptools.packages.find]
+include = ["deskconn*"]
+exclude = ["alembic*"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
