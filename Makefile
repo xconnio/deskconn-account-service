@@ -39,3 +39,9 @@ run:
 		--url ws://localhost:8080/ws \
 		--authid $(DESKCONN_ACCOUNT_AUTHID) \
 		--private-key $(DESKCONN_ACCOUNT_PRIVATE_KEY)
+
+migration:
+	./.venv/bin/alembic revision --autogenerate -m "$(name)"
+
+migrate:
+	./.venv/bin/alembic upgrade head
