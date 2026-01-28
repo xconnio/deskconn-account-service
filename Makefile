@@ -39,3 +39,9 @@ run:
 		--url ws://localhost:8080/ws \
 		--authid $(DESKCONN_ACCOUNT_AUTHID) \
 		--private-key $(DESKCONN_ACCOUNT_PRIVATE_KEY)
+
+build-docker:
+	docker build -t xconnio/deskconn-account:latest .
+
+run-docker:
+	docker compose up
