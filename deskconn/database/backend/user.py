@@ -50,13 +50,6 @@ async def delete_user(db: AsyncSession, db_user: models.User) -> None:
     await db.commit()
 
 
-async def get_user_by_id(db: AsyncSession, user_id: int) -> models.User | None:
-    stmt = select(models.User).where(models.User.id == user_id)
-    result = await db.execute(stmt)
-
-    return result.scalar()
-
-
 async def get_user_by_email(db: AsyncSession, email: str) -> models.User | None:
     stmt = select(models.User).where(models.User.email == email)
     result = await db.execute(stmt)

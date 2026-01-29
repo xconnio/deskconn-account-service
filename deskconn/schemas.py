@@ -48,7 +48,7 @@ class UserVerify(BaseModel):
 class UserGet(User):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: UUIDStr
 
 
 class UserUpdate(BaseModel):
@@ -81,7 +81,7 @@ class DeviceCreate(BaseModel):
 class DeviceGet(DeviceCreate):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: UUIDStr
 
 
 class DesktopCreate(BaseModel):
@@ -126,7 +126,7 @@ class DesktopAccessGet(BaseModel):
 class OrganizationMemberGet(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    user_id: int
+    user_id: UUIDStr
     role: models.OrganizationRole
     user: UserGet
 

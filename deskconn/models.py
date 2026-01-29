@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Enum, Integer, ForeignKey, Text, DateTime, Boolean, UUID
+from sqlalchemy import Enum, ForeignKey, Text, DateTime, Boolean, UUID
 from sqlalchemy.orm import relationship, declarative_base, mapped_column
 
 from deskconn import helpers
@@ -25,7 +25,7 @@ class InvitationStatus(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = mapped_column(Integer, primary_key=True)
+    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     email = mapped_column(Text, unique=True, nullable=False)
     password = mapped_column(Text, nullable=False)
     name = mapped_column(Text, nullable=False)
@@ -71,15 +71,14 @@ class User(Base):
 class Device(Base):
     __tablename__ = "devices"
 
-    id = mapped_column(Integer, primary_key=True)
+    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     device_id = mapped_column(Text, unique=True, nullable=False)
     name = mapped_column(Text)
     public_key = mapped_column(Text, nullable=False, index=True)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
-    user_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-
+    user_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user = relationship("User", back_populates="devices", passive_deletes=True)
 
 
@@ -93,7 +92,7 @@ class Desktop(Base):
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
-    user_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user = relationship("User", back_populates="desktops", passive_deletes=True)
     organization_id = mapped_column(
         UUID,
@@ -117,7 +116,7 @@ class Organization(Base):
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
-    owner_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    owner_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     owner = relationship(
         "User", back_populates="organizations", cascade="all, delete-orphan", passive_deletes=True, single_parent=True
     )
@@ -152,7 +151,7 @@ class OrganizationMember(Base):
     organization = relationship("Organization", back_populates="members")
 
     user_id = mapped_column(
-        Integer,
+        UUID,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -203,8 +202,8 @@ class OrganizationInvite(Base):
     organization = relationship("Organization", back_populates="invites")
 
     # Filled once invite is accepted or user exists in database
-    inviter_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    inviter_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     inviter = relationship("User", foreign_keys=[inviter_id], back_populates="inviter")
 
-    invitee_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    invitee_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     invitee = relationship("User", foreign_keys=[invitee_id], back_populates="invitee")
