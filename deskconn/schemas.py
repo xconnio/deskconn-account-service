@@ -7,7 +7,6 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, UUID4, PlainSerializer, StringConstraints, Field, EmailStr
 
 from deskconn import helpers, models
-from deskconn.models import UserRole
 
 # serialize UUID as string for JSON responses
 UUIDStr = Annotated[UUID4, PlainSerializer(lambda v: str(v), return_type=str)]
@@ -28,7 +27,6 @@ PublicKeyHex = Annotated[
 class User(BaseModel):
     email: str
     name: str
-    role: UserRole
 
 
 class UserCreate(User):
