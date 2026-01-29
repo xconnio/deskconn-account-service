@@ -25,7 +25,7 @@ class InvitationStatus(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = mapped_column(Text, unique=True, nullable=False)
     password = mapped_column(Text, nullable=False)
     name = mapped_column(Text, nullable=False)
@@ -71,31 +71,31 @@ class User(Base):
 class Device(Base):
     __tablename__ = "devices"
 
-    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     device_id = mapped_column(Text, unique=True, nullable=False)
     name = mapped_column(Text)
     public_key = mapped_column(Text, nullable=False, index=True)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
-    user_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user = relationship("User", back_populates="devices", passive_deletes=True)
 
 
 class Desktop(Base):
     __tablename__ = "desktops"
 
-    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     authid = mapped_column(Text, unique=True, nullable=False)
     name = mapped_column(Text)
     public_key = mapped_column(Text, nullable=False, index=True)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
-    user_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user = relationship("User", back_populates="desktops", passive_deletes=True)
     organization_id = mapped_column(
-        UUID,
+        UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -111,12 +111,12 @@ class Desktop(Base):
 class Organization(Base):
     __tablename__ = "organizations"
 
-    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = mapped_column(Text, nullable=False)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
-    owner_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    owner_id = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     owner = relationship(
         "User", back_populates="organizations", cascade="all, delete-orphan", passive_deletes=True, single_parent=True
     )
@@ -137,13 +137,13 @@ class Organization(Base):
 class OrganizationMember(Base):
     __tablename__ = "organization_members"
 
-    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
     organization_id = mapped_column(
-        UUID,
+        UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -151,7 +151,7 @@ class OrganizationMember(Base):
     organization = relationship("Organization", back_populates="members")
 
     user_id = mapped_column(
-        UUID,
+        UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -169,13 +169,15 @@ class OrganizationMember(Base):
 class DesktopAccess(Base):
     __tablename__ = "desktop_access"
 
-    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
 
     member_id = mapped_column(
-        UUID, ForeignKey("organization_members.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("organization_members.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    desktop_id = mapped_column(UUID, ForeignKey("desktops.id", ondelete="CASCADE"), nullable=False, index=True)
+    desktop_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey("desktops.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
@@ -186,7 +188,7 @@ class DesktopAccess(Base):
 class OrganizationInvite(Base):
     __tablename__ = "organization_invites"
 
-    id = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
     status = mapped_column(
         Enum(InvitationStatus, name="invitation_status"), nullable=False, default=InvitationStatus.pending.value
@@ -197,13 +199,17 @@ class OrganizationInvite(Base):
     expires_at = mapped_column(DateTime(timezone=True), nullable=False)
 
     organization_id = mapped_column(
-        UUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
     )
     organization = relationship("Organization", back_populates="invites")
 
     # Filled once invite is accepted or user exists in database
-    inviter_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    inviter_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     inviter = relationship("User", foreign_keys=[inviter_id], back_populates="inviter")
 
-    invitee_id = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    invitee_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     invitee = relationship("User", foreign_keys=[invitee_id], back_populates="invitee")
