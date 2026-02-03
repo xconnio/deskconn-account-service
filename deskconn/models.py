@@ -38,6 +38,7 @@ class User(Base):
 
     devices = relationship("Device", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     desktops = relationship("Desktop", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    principals = relationship("Principal", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
 
     organization_memberships = relationship(
         "OrganizationMember",
@@ -66,6 +67,19 @@ class User(Base):
         passive_deletes=True,
         foreign_keys="OrganizationInvite.invitee_id",
     )
+
+
+class Principal(Base):
+    __tablename__ = "principals"
+
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    public_key = mapped_column(Text, nullable=False, index=True)
+
+    created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
+    expires_at = mapped_column(DateTime(timezone=True), nullable=False)
+
+    user_id = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user = relationship("User", back_populates="principals", passive_deletes=True)
 
 
 class Device(Base):
