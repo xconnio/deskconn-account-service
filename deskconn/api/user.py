@@ -3,7 +3,7 @@ from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from xconn.types import Depends, CallDetails
 
-from deskconn import schemas, uris, helpers, models
+from deskconn import schemas, uris, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 
@@ -92,20 +92,3 @@ async def reset_password(rs: schemas.PasswordReset, db: AsyncSession = Depends(g
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
 
     await user_backend.reset_password(db, db_user, rs.password)
-
-
-@component.register("io.xconn.deskconn.account.upgrade", response_model=schemas.UserGet)
-async def guest_upgrade(rs: schemas.UserUpgrade, db: AsyncSession = Depends(get_database)):
-    db_user = await user_backend.get_user_by_email(db, rs.old_email)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.old_email}' not found")
-
-    if db_user.role == models.UserRole.user:
-        raise ApplicationError(
-            uris.ERROR_ROLE_ALREADY_ASSIGNED, f"User with email '{rs.old_email}' has already a role user"
-        )
-
-    if await user_backend.user_exists(db, rs.email):
-        raise ApplicationError(uris.ERROR_USER_EXISTS, f"User with email '{rs.email}' already exists")
-
-    return await user_backend.guest_upgrade(db, db_user, rs)

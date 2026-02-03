@@ -13,11 +13,7 @@ async def create_user(db: AsyncSession, data: schemas.UserCreate) -> models.User
     data.password, salt = helpers.hash_password_and_generate_salt(data.password)
     db_user = models.User(**data.model_dump(), salt=salt)
 
-    # guest users are allowed to call the APIs
-    if db_user.role == models.UserRole.guest:
-        db_user.is_verified = True
-    else:
-        await generate_and_save_otp(db, db_user)
+    await generate_and_save_otp(db, db_user)
 
     db.add(db_user)
     await db.commit()
@@ -52,21 +48,6 @@ async def delete_user(db: AsyncSession, db_user: models.User) -> None:
 
     await db.delete(db_user)
     await db.commit()
-
-
-async def guest_upgrade(db: AsyncSession, db_user: models.User, data: schemas.UserUpgrade) -> models.User:
-    db_user.name = data.name
-    db_user.email = data.email
-    db_user.password, db_user.salt = helpers.hash_password_and_generate_salt(data.password)
-    db_user.role = models.UserRole.user
-    db_user.is_verified = False
-
-    await generate_and_save_otp(db, db_user)
-
-    await db.commit()
-    await db.refresh(db_user)
-
-    return db_user
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int) -> models.User | None:

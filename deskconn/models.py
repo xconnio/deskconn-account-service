@@ -9,11 +9,6 @@ from deskconn import helpers
 Base = declarative_base()
 
 
-class UserRole(str, enum.Enum):
-    guest = "guest"
-    user = "user"
-
-
 class OrganizationRole(str, enum.Enum):
     owner = "owner"
     admin = "admin"
@@ -35,7 +30,6 @@ class User(Base):
     password = mapped_column(Text, nullable=False)
     name = mapped_column(Text, nullable=False)
     salt = mapped_column(Text)
-    role = mapped_column(Enum(UserRole, name="user_role"), nullable=False, default=UserRole.guest)
     otp_hash = mapped_column(Text)
     otp_expires_at = mapped_column(DateTime(timezone=True))
     is_verified = mapped_column(Boolean, default=False)
