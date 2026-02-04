@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import UUID
 from typing import Annotated, Literal
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 
 from pydantic import BaseModel, ConfigDict, UUID4, PlainSerializer, StringConstraints, Field, EmailStr
 
@@ -193,3 +194,16 @@ OrganizationRespondStatus = Literal[
 class OrganizationInviteRespond(BaseModel):
     invitation_id: UUID4
     status: OrganizationRespondStatus
+
+
+class PrincipalCreate(BaseModel):
+    public_key: PublicKeyHex
+    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + relativedelta(months=1))
+
+
+class PrincipalGet(PrincipalCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    created_at: DateTimeStr
+    expires_at: DateTimeStr
