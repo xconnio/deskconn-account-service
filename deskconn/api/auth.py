@@ -8,6 +8,7 @@ from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import device as device_backend
 from deskconn.database.backend import desktop as desktop_backend
+from deskconn.database.backend import principal as principal_backend
 from deskconn.database.backend import organization as organization_backend
 
 component = Component()
@@ -34,9 +35,12 @@ async def verify_cryptosign(authid: str, public_key: str, realm: str, db: AsyncS
         if not db_user.is_verified:
             raise ApplicationError(uris.ERROR_USER_NOT_VERIFIED, f"User with authid '{authid}' is not verified")
 
-        db_device = await device_backend.get_device_by_public_key(db, public_key, db_user.id)
-        if db_device is None:
-            raise ApplicationError(uris.ERROR_DEVICE_NOT_FOUND, f"Device with public key '{public_key}' not found")
+        if not await principal_backend.user_principal_exists(db, public_key, db_user):
+            db_device = await device_backend.get_device_by_public_key(db, public_key, db_user.id)
+            if db_device is None:
+                raise ApplicationError(
+                    uris.ERROR_NOT_FOUND, f"Device/Principal with public key '{public_key}' not found"
+                )
 
         await validate_user_connect_to_desktop(db, authid, realm, db_user)
 

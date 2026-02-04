@@ -35,3 +35,17 @@ async def delete_principal(db: AsyncSession, rs: schemas.PrincipalCreate, user: 
     )
     await db.execute(stmt)
     await db.commit()
+
+
+async def get_principal_by_public_key(db: AsyncSession, public_key: str, user_id: int) -> models.Device | None:
+    stmt = select(models.Device).where(models.Device.public_key == public_key).where(models.Device.user_id == user_id)
+    result = await db.execute(stmt)
+
+    return result.scalar()
+
+
+async def user_principal_exists(db: AsyncSession, public_key: str, user: models.User) -> bool:
+    stmt = select(exists().where(models.Principal.public_key == public_key).where(models.Principal.user_id == user.id))
+    result = await db.execute(stmt)
+
+    return bool(result.scalar())
