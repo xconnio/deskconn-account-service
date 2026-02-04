@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, exists, Sequence, delete
+from sqlalchemy import select, exists, Sequence, delete, union_all, func
 
 from deskconn import models, schemas
 
@@ -132,3 +132,40 @@ async def delete_user_desktop_access(db: AsyncSession, db_user: models.User) -> 
 async def delete_user_desktops(db: AsyncSession, db_user: models.User) -> None:
     stmt = delete(models.Desktop).where(models.Desktop.user_id == db_user.id)
     await db.execute(stmt)
+
+
+async def get_desktop_access_public_keys(db: AsyncSession, desktop_id: UUID) -> dict[str, list[str]]:
+    base_users = (
+        select(models.OrganizationMember.user_id)
+        .join(models.DesktopAccess, models.DesktopAccess.member_id == models.OrganizationMember.id)
+        .where(models.DesktopAccess.desktop_id == desktop_id)
+        .subquery()
+    )
+
+    principal_query = (
+        select(models.User.email.label("authid"), models.Principal.public_key.label("public_key"))
+        .join(base_users, models.Principal.user_id == base_users.c.user_id)
+        .join(models.User, models.User.id == models.Principal.user_id)
+        .where(models.Principal.expires_at > func.now())
+    )
+
+    device_query = (
+        select(models.User.email.label("authid"), models.Device.public_key.label("public_key"))
+        .join(base_users, models.Device.user_id == base_users.c.user_id)
+        .join(models.User, models.User.id == models.Device.user_id)
+    )
+
+    desktop_query = select(models.Desktop.authid.label("authid"), models.Desktop.public_key.label("public_key")).join(
+        base_users, models.Desktop.user_id == base_users.c.user_id
+    )
+
+    keys_union = union_all(principal_query, device_query, desktop_query).subquery()
+
+    stmt = select(keys_union.c.authid, keys_union.c.public_key).distinct()
+    result = await db.execute(stmt)
+
+    authorized_keys: dict[str, list[str]] = {}
+    for authid, public_key in result.all():
+        authorized_keys.setdefault(authid, []).append(public_key)
+
+    return authorized_keys
