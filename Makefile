@@ -45,3 +45,9 @@ migration:
 
 migrate:
 	./.venv/bin/alembic upgrade head
+
+build-docker:
+	docker build -t xconnio/deskconn-account:latest .
+
+run-docker:
+	docker compose up
