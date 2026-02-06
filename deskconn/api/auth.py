@@ -52,7 +52,7 @@ async def verify_cryptosign(authid: str, public_key: str, realm: str, db: AsyncS
                 uris.ERROR_DEVICE_NOT_FOUND, f"Desktop with authid '{authid}' public key '{public_key}' not found"
             )
 
-        if db_desktop.realm not in (realm, helpers.CLOUD_REALM):
+        if realm not in (db_desktop.realm, helpers.CLOUD_REALM):
             raise ApplicationError(
                 uris.ERROR_AUTHENTICATION_FAILED, f"Desktop is not authorized to access realm '{realm}'"
             )
