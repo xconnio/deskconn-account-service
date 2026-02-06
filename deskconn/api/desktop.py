@@ -42,7 +42,18 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
         component.session, PROCEDURE_ADD_REALM, [realm], "Got error upon creating realm for desktop"
     )
 
-    return await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
+    desktop = await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
+
+    # publish new keys to desktops
+    desktop_authorizations = await desktop_backend.get_user_desktops_authid_with_authrole(db, db_user.id)
+    for desktop_authid, authrole in desktop_authorizations:
+        await component.session.publish(
+            helpers.TOPIC_KEY_ADD.format(machine_id=desktop_authid),
+            [desktop.authid, desktop.public_key, authrole],
+            options={"acknowledge": True},
+        )
+
+    return desktop
 
 
 @component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)

@@ -3,10 +3,11 @@ from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from xconn.types import Depends, CallDetails
 
-from deskconn import schemas, uris
+from deskconn import schemas, uris, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import device as device_backend
+from deskconn.database.backend import desktop as desktop_backend
 
 component = Component()
 
@@ -23,7 +24,18 @@ async def create(rs: schemas.DeviceCreate, details: CallDetails, db: AsyncSessio
             f"Device with public key '{rs.public_key}' or device_id '{rs.device_id}' already exists",
         )
 
-    return await device_backend.create_device(db, rs, db_user)
+    device = await device_backend.create_device(db, rs, db_user)
+
+    # publish new keys to desktops
+    desktop_authorizations = await desktop_backend.get_user_desktops_authid_with_authrole(db, db_user.id)
+    for desktop_authid, authrole in desktop_authorizations:
+        await component.session.publish(
+            helpers.TOPIC_KEY_ADD.format(machine_id=desktop_authid),
+            [db_user.email, device.public_key, authrole],
+            options={"acknowledge": True},
+        )
+
+    return device
 
 
 @component.register("io.xconn.deskconn.device.key.list", response_model=schemas.DeviceGet)
