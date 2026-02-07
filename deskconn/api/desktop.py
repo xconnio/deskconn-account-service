@@ -122,3 +122,12 @@ async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: Async
         raise ApplicationError(uris.ERROR_USER_ALREADY_MEMBER, "User already has access to this desktop")
 
     return await desktop_backend.grant_access_to_desktop(db, db_desktop.id, db_organization_membership.id, rs.role)
+
+
+@component.register("io.xconn.deskconn.desktop.access.key.list")
+async def access_keys(details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_desktop = await desktop_backend.get_desktop_by_authid(db, details.authid)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with authid '{details.authid}' not found")
+
+    return await desktop_backend.get_desktop_access_public_keys(db, db_desktop.id)
