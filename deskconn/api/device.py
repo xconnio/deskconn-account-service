@@ -33,3 +33,21 @@ async def list_public_keys(details: CallDetails, db: AsyncSession = Depends(get_
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
     return await device_backend.get_user_public_keys(db, db_user.id)
+
+
+@component.register("io.xconn.deskconn.device.list", response_model=schemas.DeviceGet)
+async def list_devices(details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    return await device_backend.list_user_devices(db, db_user.id)
+
+
+@component.register("io.xconn.deskconn.device.delete")
+async def delete(device_id: str, details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    await device_backend.delete_device(db, device_id)
