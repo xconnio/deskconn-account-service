@@ -53,3 +53,12 @@ async def delete(rs: schemas.PrincipalCreate, details: CallDetails, db: AsyncSes
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
     await principal_backend.delete_principal(db, rs, db_user)
+
+    # publish keys removal to desktops
+    db_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
+    for desktop in db_desktops:
+        await component.session.publish(
+            helpers.TOPIC_KEY_REMOVE.format(machine_id=desktop.authid),
+            [{db_user.email: [rs.public_key]}],
+            options={"acknowledge": True},
+        )

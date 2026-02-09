@@ -6,6 +6,7 @@ from xconn.types import Depends, CallDetails
 from deskconn import schemas, uris, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
+from deskconn.database.backend import desktop as desktop_backend
 
 component = Component()
 
@@ -46,7 +47,16 @@ async def delete(details: CallDetails, db: AsyncSession = Depends(get_database))
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
+    # publish keys removal to desktops
+    db_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
+    authorized_keys = await user_backend.get_user_public_keys(db, db_user.id)
+
     await user_backend.delete_user(db, db_user)
+
+    for desktop in db_desktops:
+        await component.session.publish(
+            helpers.TOPIC_KEY_REMOVE.format(machine_id=desktop.authid), [authorized_keys], options={"acknowledge": True}
+        )
 
 
 @component.register("io.xconn.deskconn.account.verify")

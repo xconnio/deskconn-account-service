@@ -28,6 +28,7 @@ CLOUD_REALM = "io.xconn.deskconn"
 TOPIC_DESKTOP_DETACH = "io.xconn.deskconn.desktop.{machine_id}.detach"
 RPC_KILL_SESSION = "wamp.session.kill_by_authid"
 TOPIC_KEY_ADD = "io.xconn.deskconn.desktop.{machine_id}.key.add"
+TOPIC_KEY_REMOVE = "io.xconn.deskconn.desktop.{machine_id}.key.remove"
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", None)
 if RESEND_API_KEY is None or RESEND_API_KEY == "":

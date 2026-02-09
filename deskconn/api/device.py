@@ -62,4 +62,13 @@ async def delete(device_id: str, details: CallDetails, db: AsyncSession = Depend
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    await device_backend.delete_device(db, device_id)
+    public_key = await device_backend.delete_device(db, device_id)
+
+    # publish keys removal to desktops
+    db_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
+    for desktop in db_desktops:
+        await component.session.publish(
+            helpers.TOPIC_KEY_REMOVE.format(machine_id=desktop.authid),
+            [{db_user.email: [public_key]}],
+            options={"acknowledge": True},
+        )

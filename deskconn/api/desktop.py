@@ -111,6 +111,15 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
         component.session, helpers.RPC_KILL_SESSION, [db_desktop.authid], "Got error upon killing session for desktop"
     )
 
+    # publish keys removal to desktops
+    db_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
+    for desktop in db_desktops:
+        await component.session.publish(
+            helpers.TOPIC_KEY_REMOVE.format(machine_id=desktop.authid),
+            [{db_desktop.authid: [db_desktop.public_key]}],
+            options={"acknowledge": True},
+        )
+
 
 @component.register("io.xconn.deskconn.desktop.access.grant", response_model=schemas.DesktopAccessGet)
 async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: AsyncSession = Depends(get_database)):
