@@ -186,14 +186,22 @@ async def respond_to_invitation(
 
 
 async def list_inbox_invitation(db: AsyncSession, user: models.User) -> Sequence[models.OrganizationInvite]:
-    stmt = select(models.OrganizationInvite).where(models.OrganizationInvite.invitee_id == user.id)
+    stmt = (
+        select(models.OrganizationInvite)
+        .where(models.OrganizationInvite.invitee_id == user.id)
+        .where(models.OrganizationInvite.status == models.InvitationStatus.pending)
+    )
 
     result = await db.execute(stmt)
     return result.scalars().all()
 
 
 async def list_outbox_invitation(db: AsyncSession, user: models.User) -> Sequence[models.OrganizationInvite]:
-    stmt = select(models.OrganizationInvite).where(models.OrganizationInvite.inviter_id == user.id)
+    stmt = (
+        select(models.OrganizationInvite)
+        .where(models.OrganizationInvite.inviter_id == user.id)
+        .where(models.OrganizationInvite.status == models.InvitationStatus.pending)
+    )
 
     result = await db.execute(stmt)
     return result.scalars().all()
