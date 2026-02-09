@@ -134,38 +134,47 @@ async def delete_user_desktops(db: AsyncSession, db_user: models.User) -> None:
     await db.execute(stmt)
 
 
-async def get_desktop_access_public_keys(db: AsyncSession, desktop_id: UUID) -> dict[str, list[str]]:
+async def get_desktop_access_public_keys(db: AsyncSession, desktop_id: UUID) -> list[dict[str, Any]]:
     base_users = (
-        select(models.OrganizationMember.user_id)
+        select(models.OrganizationMember.user_id.label("user_id"), models.DesktopAccess.role.label("authrole"))
         .join(models.DesktopAccess, models.DesktopAccess.member_id == models.OrganizationMember.id)
         .where(models.DesktopAccess.desktop_id == desktop_id)
         .subquery()
     )
 
     principal_query = (
-        select(models.User.email.label("authid"), models.Principal.public_key.label("public_key"))
+        select(
+            models.User.email.label("authid"), models.Principal.public_key.label("public_key"), base_users.c.authrole
+        )
         .join(base_users, models.Principal.user_id == base_users.c.user_id)
         .join(models.User, models.User.id == models.Principal.user_id)
         .where(models.Principal.expires_at > func.now())
     )
 
     device_query = (
-        select(models.User.email.label("authid"), models.Device.public_key.label("public_key"))
+        select(models.User.email.label("authid"), models.Device.public_key.label("public_key"), base_users.c.authrole)
         .join(base_users, models.Device.user_id == base_users.c.user_id)
         .join(models.User, models.User.id == models.Device.user_id)
     )
 
-    desktop_query = select(models.Desktop.authid.label("authid"), models.Desktop.public_key.label("public_key")).join(
-        base_users, models.Desktop.user_id == base_users.c.user_id
-    )
+    desktop_query = select(
+        models.Desktop.authid.label("authid"), models.Desktop.public_key.label("public_key"), base_users.c.authrole
+    ).join(base_users, models.Desktop.user_id == base_users.c.user_id)
 
     keys_union = union_all(principal_query, device_query, desktop_query).subquery()
 
-    stmt = select(keys_union.c.authid, keys_union.c.public_key).distinct()
+    stmt = select(keys_union.c.authid, keys_union.c.public_key, keys_union.c.authrole).distinct()
     result = await db.execute(stmt)
 
-    authorized_keys: dict[str, list[str]] = {}
-    for authid, public_key in result.all():
-        authorized_keys.setdefault(authid, []).append(public_key)
+    desktop_authorizations: dict[str, dict] = {}
+    for authid, public_key, authrole in result.all():
+        if authid not in desktop_authorizations:
+            desktop_authorizations[authid] = {
+                "authid": authid,
+                "authorized_keys": [],
+                "authrole": authrole,
+            }
 
-    return authorized_keys
+        desktop_authorizations[authid]["authorized_keys"].append(public_key)
+
+    return list(desktop_authorizations.values())
