@@ -38,7 +38,9 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     realm = f"io.xconn.deskconn.{db_organization_membership.organization_id}.{rs.authid}"
 
     # call router rpc to add realm
-    await helpers.call_cloud_router_rpc(component.session, PROCEDURE_ADD_REALM, [realm])
+    await helpers.call_cloud_router_rpc(
+        component.session, PROCEDURE_ADD_REALM, [realm], "Got error upon creating realm for desktop"
+    )
 
     return await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
 
@@ -78,13 +80,15 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
 
     db_desktop = await desktop_backend.get_desktop_by_authid(db, rs.authid)
     if db_desktop is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"Desktop with authid '{rs.authid}' not found")
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with authid '{rs.authid}' not found")
 
     if db_desktop.user_id != db_user.id:
         raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot detach a desktop from another user")
 
     # call router rpc to remove realm
-    await helpers.call_cloud_router_rpc(component.session, PROCEDURE_REMOVE_REALM, [db_desktop.realm])
+    await helpers.call_cloud_router_rpc(
+        component.session, PROCEDURE_REMOVE_REALM, [db_desktop.realm], "Got error upon deleting realm for desktop"
+    )
 
     await desktop_backend.delete_desktop(db, db_desktop)
 
