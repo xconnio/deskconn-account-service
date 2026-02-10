@@ -122,12 +122,10 @@ def send_organization_invite_email(inviter: str, invitee: str):
     thread.start()
 
 
-async def call_cloud_router_rpc(session: AsyncSession, uri: str, args: list[Any]):
+async def call_cloud_router_rpc(session: AsyncSession, uri: str, args: list[Any], error_message: str) -> None:
     try:
         await session.call(uri, args)
     except ApplicationError as app_err:
-        raise ApplicationError(
-            uris.ERROR_INTERNAL_ERROR, f"Got error upon deleting realm for desktop. Error is: {app_err.args}"
-        )
+        raise ApplicationError(uris.ERROR_INTERNAL_ERROR, f"{error_message}. Error is: {app_err.args}")
     except Exception as err:
         raise ApplicationError(uris.ERROR_INTERNAL_ERROR, str(err))
