@@ -92,6 +92,10 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
 
     await desktop_backend.delete_desktop(db, db_desktop)
 
+    await component.session.publish(
+        helpers.TOPIC_DESKTOP_DETACH.format(machine_id=db_desktop.authid), options={"acknowledge": True}
+    )
+
 
 @component.register("io.xconn.deskconn.desktop.access.grant", response_model=schemas.DesktopAccessGet)
 async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: AsyncSession = Depends(get_database)):
