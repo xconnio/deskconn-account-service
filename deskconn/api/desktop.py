@@ -96,6 +96,10 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
         helpers.TOPIC_DESKTOP_DETACH.format(machine_id=db_desktop.authid), options={"acknowledge": True}
     )
 
+    await helpers.call_cloud_router_rpc(
+        component.session, helpers.RPC_KILL_SESSION, [db_desktop.authid], "Got error upon killing session for desktop"
+    )
+
 
 @component.register("io.xconn.deskconn.desktop.access.grant", response_model=schemas.DesktopAccessGet)
 async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: AsyncSession = Depends(get_database)):
