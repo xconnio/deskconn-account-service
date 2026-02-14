@@ -50,7 +50,9 @@ async def list_user_devices(db: AsyncSession, user_id: UUID) -> Sequence[models.
     return result.scalars().all()
 
 
-async def delete_device(db: AsyncSession, device_id: str) -> None:
-    stmt = delete(models.Device).where(models.Device.device_id == device_id)
-    await db.execute(stmt)
+async def delete_device(db: AsyncSession, device_id: str) -> str:
+    stmt = delete(models.Device).where(models.Device.device_id == device_id).returning(models.Device.public_key)
+    result = await db.execute(stmt)
     await db.commit()
+
+    return result.scalar()

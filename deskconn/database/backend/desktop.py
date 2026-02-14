@@ -31,7 +31,7 @@ async def desktop_exists_by_authid(db: AsyncSession, authid: str) -> bool:
     return bool(result.scalar())
 
 
-async def get_user_desktops(db: AsyncSession, user_id: int) -> Sequence[models.Desktop]:
+async def get_user_desktops(db: AsyncSession, user_id: UUID) -> Sequence[models.Desktop]:
     stmt = (
         select(models.Desktop)
         .join(models.Desktop.accesses)
@@ -43,6 +43,21 @@ async def get_user_desktops(db: AsyncSession, user_id: int) -> Sequence[models.D
     result = await db.execute(stmt)
 
     return result.scalars().all()
+
+
+async def get_user_desktops_authid_with_authrole(
+    db: AsyncSession, user_id: UUID
+) -> Sequence[str, models.OrganizationRole]:
+    stmt = (
+        select(models.Desktop.authid, models.DesktopAccess.role)
+        .join(models.Desktop.accesses)
+        .join(models.DesktopAccess.member)
+        .where(models.OrganizationMember.user_id == user_id)
+    )
+
+    result = await db.execute(stmt)
+
+    return result.all()
 
 
 async def get_user_desktop_by_id(db: AsyncSession, desktop_id: UUID, db_user: models.User) -> models.Desktop:
