@@ -1,6 +1,7 @@
+from uuid import UUID
 from typing import Any
 
-from sqlalchemy import select, exists
+from sqlalchemy import select, exists, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from deskconn import models, schemas, helpers
@@ -81,3 +82,33 @@ async def user_exists(db: AsyncSession, email: str) -> bool:
     result = await db.execute(stmt)
 
     return bool(result.scalar())
+
+
+async def get_user_public_keys(db: AsyncSession, user_id: UUID) -> dict[str, list[str]]:
+    principal_query = (
+        select(models.User.email.label("authid"), models.Principal.public_key.label("public_key"))
+        .join(models.User, models.User.id == models.Principal.user_id)
+        .where(models.Principal.user_id == user_id)
+    )
+
+    device_query = (
+        select(models.User.email.label("authid"), models.Device.public_key.label("public_key"))
+        .join(models.User, models.User.id == models.Device.user_id)
+        .where(models.Device.user_id == user_id)
+    )
+
+    desktop_query = select(models.Desktop.authid.label("authid"), models.Desktop.public_key.label("public_key")).where(
+        models.Desktop.user_id == user_id
+    )
+
+    keys_union = union_all(principal_query, device_query, desktop_query).subquery()
+
+    stmt = select(keys_union.c.authid, keys_union.c.public_key).distinct()
+    result = await db.execute(stmt)
+
+    authorized_keys: dict[str, list[str]] = {}
+
+    for authid, public_key in result.all():
+        authorized_keys.setdefault(authid, []).append(public_key)
+
+    return authorized_keys

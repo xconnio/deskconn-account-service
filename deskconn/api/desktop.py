@@ -42,7 +42,18 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
         component.session, PROCEDURE_ADD_REALM, [realm], "Got error upon creating realm for desktop"
     )
 
-    return await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
+    desktop = await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
+
+    # publish new keys to desktops
+    desktop_authorizations = await desktop_backend.get_user_desktops_authid_with_authrole(db, db_user.id)
+    for desktop_authid, authrole in desktop_authorizations:
+        await component.session.publish(
+            helpers.TOPIC_KEY_ADD.format(machine_id=desktop_authid),
+            [desktop.authid, desktop.public_key, authrole],
+            options={"acknowledge": True},
+        )
+
+    return desktop
 
 
 @component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)
@@ -99,6 +110,15 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
     await helpers.call_cloud_router_rpc(
         component.session, helpers.RPC_KILL_SESSION, [db_desktop.authid], "Got error upon killing session for desktop"
     )
+
+    # publish keys removal to desktops
+    db_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
+    for desktop in db_desktops:
+        await component.session.publish(
+            helpers.TOPIC_KEY_REMOVE.format(machine_id=desktop.authid),
+            [{db_desktop.authid: [db_desktop.public_key]}],
+            options={"acknowledge": True},
+        )
 
 
 @component.register("io.xconn.deskconn.desktop.access.grant", response_model=schemas.DesktopAccessGet)
