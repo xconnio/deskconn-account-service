@@ -35,6 +35,12 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     if db_organization_membership is None:
         raise ApplicationError(uris.ERROR_INTERNAL_ERROR, "Organization membership not found")
 
+    if await desktop_backend.desktop_name_unique_in_organization(db, rs.name, db_organization.id):
+        raise ApplicationError(
+            uris.ERROR_DESKTOP_EXISTS,
+            f"Desktop with name '{rs.name}' already exists in organization with ID '{db_organization.id}'",
+        )
+
     realm = f"io.xconn.deskconn.{db_organization_membership.organization_id}.{rs.authid}"
 
     # call router rpc to add realm
