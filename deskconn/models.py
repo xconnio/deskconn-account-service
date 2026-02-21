@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Text, DateTime, Boolean, UUID
+from sqlalchemy import Enum, ForeignKey, Text, DateTime, Boolean, UUID, UniqueConstraint
 from sqlalchemy.orm import relationship, declarative_base, mapped_column
 
 from deskconn import helpers
@@ -99,9 +99,11 @@ class Device(Base):
 class Desktop(Base):
     __tablename__ = "desktops"
 
+    __table_args__ = (UniqueConstraint("organization_id", "name", name="uq_desktop_org_name"),)
+
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     authid = mapped_column(Text, unique=True, nullable=False)
-    name = mapped_column(Text)
+    name = mapped_column(Text, nullable=False)
     public_key = mapped_column(Text, nullable=False, index=True)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)

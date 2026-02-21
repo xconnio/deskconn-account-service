@@ -89,7 +89,7 @@ class DesktopCreate(BaseModel):
     authid: str
     public_key: PublicKeyHex
     organization_id: UUID4
-    name: str | None = None
+    name: str
 
 
 class DesktopGet(DesktopCreate):

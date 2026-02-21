@@ -31,6 +31,13 @@ async def desktop_exists_by_authid(db: AsyncSession, authid: str) -> bool:
     return bool(result.scalar())
 
 
+async def desktop_name_unique_in_organization(db: AsyncSession, name: str, organization_id: UUID) -> bool:
+    stmt = select(exists().where(models.Desktop.name == name).where(models.Desktop.organization_id == organization_id))
+    result = await db.execute(stmt)
+
+    return bool(result.scalar())
+
+
 async def get_user_desktops(db: AsyncSession, user_id: UUID) -> Sequence[models.Desktop]:
     stmt = (
         select(models.Desktop)
