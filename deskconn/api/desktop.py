@@ -63,12 +63,12 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
 
 
 @component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)
-async def list_desktops(details: CallDetails, db: AsyncSession = Depends(get_database)):
+async def list_desktops(rs: schemas.DesktopList, details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    return await desktop_backend.get_user_desktops(db, db_user.id)
+    return await desktop_backend.get_user_desktops(db, db_user.id, rs.name)
 
 
 @component.register("io.xconn.deskconn.desktop.update", response_model=schemas.DesktopGet)

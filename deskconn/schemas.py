@@ -92,6 +92,10 @@ class DesktopCreate(BaseModel):
     name: str
 
 
+class DesktopList(BaseModel):
+    name: str | None = None
+
+
 class DesktopGet(DesktopCreate):
     model_config = ConfigDict(from_attributes=True)
 

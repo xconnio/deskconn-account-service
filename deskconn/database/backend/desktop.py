@@ -38,7 +38,7 @@ async def desktop_name_unique_in_organization(db: AsyncSession, name: str, organ
     return bool(result.scalar())
 
 
-async def get_user_desktops(db: AsyncSession, user_id: UUID) -> Sequence[models.Desktop]:
+async def get_user_desktops(db: AsyncSession, user_id: UUID, name: str | None) -> Sequence[models.Desktop]:
     stmt = (
         select(models.Desktop)
         .join(models.Desktop.accesses)
@@ -46,6 +46,9 @@ async def get_user_desktops(db: AsyncSession, user_id: UUID) -> Sequence[models.
         .where(models.OrganizationMember.user_id == user_id)
         .distinct()
     )
+
+    if name is not None:
+        stmt = stmt.where(models.Desktop.name == name)
 
     result = await db.execute(stmt)
 
