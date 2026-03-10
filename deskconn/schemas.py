@@ -104,6 +104,10 @@ class DesktopGet(DesktopCreate):
     realm: str
 
 
+class DesktopWithOrganization(DesktopGet):
+    organization: OrganizationGet
+
+
 class DesktopDetach(BaseModel):
     authid: str
 

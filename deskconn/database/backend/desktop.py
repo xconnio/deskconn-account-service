@@ -1,6 +1,7 @@
 from uuid import UUID
 from typing import Any
 
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, exists, Sequence, delete, union_all, func
 
@@ -41,6 +42,7 @@ async def desktop_name_unique_in_organization(db: AsyncSession, name: str, organ
 async def get_user_desktops(db: AsyncSession, user_id: UUID, name: str | None = None) -> Sequence[models.Desktop]:
     stmt = (
         select(models.Desktop)
+        .options(joinedload(models.Desktop.organization))
         .join(models.Desktop.accesses)
         .join(models.DesktopAccess.member)
         .where(models.OrganizationMember.user_id == user_id)
