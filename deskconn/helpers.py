@@ -49,7 +49,7 @@ def release_asset_name(application_name: str, version: str, os_name: str, arch: 
 def release_download_url(base_url: str, version: str, application_name: str, os_name: str, arch: str) -> str:
     asset_name = release_asset_name(application_name, version, os_name, arch)
 
-    return f"{base_url.rstrip('/')}/{version}/{asset_name}"
+    return f"{base_url.rstrip('/')}/v{version}/{asset_name}"
 
 
 def hash_password_and_generate_salt(password: str) -> Tuple[str, str]:
