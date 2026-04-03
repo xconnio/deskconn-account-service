@@ -62,7 +62,7 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     return desktop
 
 
-@component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)
+@component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopWithOrganization)
 async def list_desktops(rs: schemas.DesktopList, details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
