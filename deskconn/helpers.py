@@ -23,6 +23,7 @@ ROLE_USER = "user"
 ROLE_DESKTOP = "xconnio:deskconn:desktop:{authid}"
 OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 5
+DEFAULT_DESKCONN_RELEASE_BASE_URL = "https://github.com/xconnio/deskconn/releases/download"
 
 CLOUD_REALM = "io.xconn.deskconn"
 TOPIC_DESKTOP_DETACH = "io.xconn.deskconn.desktop.{machine_id}.detach"
@@ -39,6 +40,16 @@ resend.api_key = RESEND_API_KEY
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+def release_asset_name(application_name: str, version: str, os_name: str, arch: str) -> str:
+    return f"{application_name}_{version.lstrip('v')}_{os_name}_{arch}.tar.gz"
+
+
+def release_download_url(base_url: str, version: str, application_name: str, os_name: str, arch: str) -> str:
+    asset_name = release_asset_name(application_name, version, os_name, arch)
+
+    return f"{base_url.rstrip('/')}/{version}/{asset_name}"
 
 
 def hash_password_and_generate_salt(password: str) -> Tuple[str, str]:
