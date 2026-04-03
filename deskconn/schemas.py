@@ -211,3 +211,41 @@ class PrincipalGet(PrincipalCreate):
     id: UUIDStr
     created_at: DateTimeStr
     expires_at: DateTimeStr
+
+
+class AppVersionUpload(BaseModel):
+    name: str
+    version: str
+    checksum: str
+
+
+class AppVersionCheck(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
+    name: str
+    version: str
+    os: models.OS
+    cpu_architecture: models.CPUArchitecture
+
+
+class AppVersionCheckResult(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    current_version: str
+    latest_version: str
+    os: str
+    cpu_architecture: models.CPUArchitecture
+    download_url: str
+    asset_name: str
+    checksum: str
+    released_at: DateTimeStr
+
+
+class AppVersionGet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    version: str
+    checksum: str
+    released_at: DateTimeStr

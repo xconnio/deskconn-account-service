@@ -22,6 +22,15 @@ class InvitationStatus(str, enum.Enum):
     expired = "expired"
 
 
+class CPUArchitecture(str, enum.Enum):
+    amd64 = "amd64"
+    arm64 = "arm64"
+
+
+class OS(str, enum.Enum):
+    linux = "linux"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -229,3 +238,39 @@ class OrganizationInvite(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     invitee = relationship("User", foreign_keys=[invitee_id], back_populates="invitee")
+
+
+class App(Base):
+    __tablename__ = "apps"
+
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = mapped_column(Text, unique=True, nullable=False)
+    last_updated = mapped_column(DateTime(timezone=True))
+
+    created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
+
+    versions = relationship(
+        "AppVersion",
+        back_populates="app",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class AppVersion(Base):
+    __tablename__ = "app_versions"
+
+    __table_args__ = (UniqueConstraint("app_id", "version", name="uq_app_versions_app_version"),)
+
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version = mapped_column(Text, nullable=False)
+    checksum = mapped_column(Text)
+    released_at = mapped_column(DateTime(timezone=True), nullable=False, default=helpers.utcnow)
+
+    app_id = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("apps.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    app = relationship("App", back_populates="versions", passive_deletes=True)
