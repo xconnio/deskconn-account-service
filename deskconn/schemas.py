@@ -253,3 +253,8 @@ class AppVersionGet(BaseModel):
     version: str
     checksum: str
     released_at: DateTimeStr
+
+
+class CoturnCredentials(BaseModel):
+    username: str
+    password: str
