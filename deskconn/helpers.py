@@ -158,8 +158,8 @@ async def call_cloud_router_rpc(session: AsyncSession, uri: str, args: list[Any]
 @dataclass
 class CoturnCredentials:
     username: str
-    password: str
-    expires_at: datetime
+    credential: str
+    expires_at: int
 
 
 def generate_coturn_credentials(user_id: UUID, ttl: int = TURN_CREDS_TTL) -> CoturnCredentials:
@@ -167,7 +167,6 @@ def generate_coturn_credentials(user_id: UUID, ttl: int = TURN_CREDS_TTL) -> Cot
 
     username = f"{expiry}:{user_id}"
     digest = hmac.new(COTURN_SECRET.encode(), username.encode(), hashlib.sha1).digest()
-    password = base64.b64encode(digest).decode()
-    expires_at = datetime.fromtimestamp(expiry, tz=timezone.utc)
+    credential = base64.b64encode(digest).decode()
 
-    return CoturnCredentials(username=username, password=password, expires_at=expires_at)
+    return CoturnCredentials(username=username, credential=credential, expires_at=expiry)

@@ -257,6 +257,6 @@ class AppVersionGet(BaseModel):
 
 class CoturnCredentials(BaseModel):
     username: str
-    password: str
-    expires_at: DateTimeStr
+    credential: str
+    expires_at: int
     urls: list[str]
