@@ -25,5 +25,5 @@ async def generate_coturn_credentials(details: CallDetails, db: AsyncSession = D
     creds = helpers.generate_coturn_credentials(db_user.id)
 
     return schemas.CoturnCredentials(
-        username=creds.username, password=creds.password, expires_at=creds.expires_at, urls=COTURN_URLS
+        username=creds.username, credential=creds.credential, expires_at=creds.expires_at, urls=COTURN_URLS
     ).model_dump()
