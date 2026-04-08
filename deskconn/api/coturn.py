@@ -9,11 +9,21 @@ from deskconn.database.backend import user as user_backend
 
 component = Component()
 
+COTURN_URLS = [
+    "turns:turn.deskconn.com:5349?transport=tcp",
+    "turn:turn.deskconn.com:3478?transport=tcp",
+    "turn:turn.deskconn.com:3478?transport=udp",
+]
 
-@component.register("io.xconn.deskconn.coturn.credentials.create", response_model=schemas.CoturnCredentials)
+
+@component.register("io.xconn.deskconn.coturn.credentials.create")
 async def generate_coturn_credentials(details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    return helpers.generate_coturn_credentials(db_user.id)
+    creds = helpers.generate_coturn_credentials(db_user.id)
+
+    return schemas.CoturnCredentials(
+        username=creds.username, password=creds.password, expires_at=creds.expires_at, urls=COTURN_URLS
+    ).model_dump()

@@ -7,6 +7,7 @@ import hashlib
 import threading
 from uuid import UUID
 from typing import Tuple, Any
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
 import resend
@@ -154,11 +155,19 @@ async def call_cloud_router_rpc(session: AsyncSession, uri: str, args: list[Any]
         raise ApplicationError(uris.ERROR_INTERNAL_ERROR, str(err))
 
 
-def generate_coturn_credentials(user_id: UUID, ttl: int = TURN_CREDS_TTL) -> Tuple[str, str]:
+@dataclass
+class CoturnCredentials:
+    username: str
+    password: str
+    expires_at: datetime
+
+
+def generate_coturn_credentials(user_id: UUID, ttl: int = TURN_CREDS_TTL) -> CoturnCredentials:
     expiry = int(time.time()) + ttl
 
     username = f"{expiry}:{user_id}"
     digest = hmac.new(COTURN_SECRET.encode(), username.encode(), hashlib.sha1).digest()
     password = base64.b64encode(digest).decode()
+    expires_at = datetime.fromtimestamp(expiry, tz=timezone.utc)
 
-    return username, password
+    return CoturnCredentials(username=username, password=password, expires_at=expires_at)
