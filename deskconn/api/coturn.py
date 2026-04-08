@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from deskconn import schemas, uris, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
+from deskconn.database.backend import desktop as desktop_backend
 
 component = Component()
 
@@ -20,9 +21,14 @@ COTURN_URLS = [
 async def generate_coturn_credentials(details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+        db_desktop = await desktop_backend.get_desktop_by_authid(db, details.authid)
+        if db_desktop is None:
+            raise ApplicationError(uris.ERROR_NOT_FOUND, f"User/Desktop with authid '{details.authid}' not found")
+        user_id = db_desktop.id
+    else:
+        user_id = db_user.id
 
-    creds = helpers.generate_coturn_credentials(db_user.id)
+    creds = helpers.generate_coturn_credentials(user_id)
 
     return schemas.CoturnCredentials(
         username=creds.username, credential=creds.credential, expires_at=creds.expires_at, urls=COTURN_URLS
