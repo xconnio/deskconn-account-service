@@ -1,4 +1,4 @@
-.PHONY: setup
+.PHONY: setup db down
 -include .env
 export $(shell sed 's/=.*//' .env 2>/dev/null || true)
 
@@ -45,3 +45,12 @@ migration:
 
 migrate:
 	./.venv/bin/alembic upgrade head
+
+db:
+	docker compose up -d postgres
+	until docker compose exec -T postgres pg_isready -U postgres -d postgres >/dev/null 2>&1; do sleep 1; done
+	docker compose exec -T postgres /docker-entrypoint-initdb.d/01-init.sh
+	$(MAKE) migrate
+
+down:
+	docker compose down -v

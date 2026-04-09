@@ -1,15 +1,31 @@
 import enum
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Text, DateTime, Boolean, UUID, UniqueConstraint
+from sqlalchemy import Enum, ForeignKey, Text, DateTime, Boolean, UUID, UniqueConstraint, MetaData
 from sqlalchemy.orm import relationship, declarative_base, mapped_column
 
 from deskconn import helpers
 
-Base = declarative_base()
+
+DESKCONN_SCHEMA = "deskconn"
+
+metadata = MetaData(schema=DESKCONN_SCHEMA)
+Base = declarative_base(metadata=metadata)
 
 
-class OrganizationRole(str, enum.Enum):
+class OrganizationMemberRole(str, enum.Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+
+
+class DesktopAccessRole(str, enum.Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+
+
+class OrganizationInviteRole(str, enum.Enum):
     owner = "owner"
     admin = "admin"
     member = "member"
@@ -163,7 +179,9 @@ class OrganizationMember(Base):
     __tablename__ = "organization_members"
 
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
+    role = mapped_column(
+        Enum(OrganizationMemberRole, name="organization_member_role", schema=DESKCONN_SCHEMA), nullable=False
+    )
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
 
@@ -195,7 +213,7 @@ class DesktopAccess(Base):
     __tablename__ = "desktop_access"
 
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
+    role = mapped_column(Enum(DesktopAccessRole, name="desktop_access_role", schema=DESKCONN_SCHEMA), nullable=False)
 
     member_id = mapped_column(
         UUID(as_uuid=True), ForeignKey("organization_members.id", ondelete="CASCADE"), nullable=False, index=True
@@ -214,9 +232,13 @@ class OrganizationInvite(Base):
     __tablename__ = "organization_invites"
 
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    role = mapped_column(Enum(OrganizationRole, name="organization_role"), nullable=False)
+    role = mapped_column(
+        Enum(OrganizationInviteRole, name="organization_invite_role", schema=DESKCONN_SCHEMA), nullable=False
+    )
     status = mapped_column(
-        Enum(InvitationStatus, name="invitation_status"), nullable=False, default=InvitationStatus.pending.value
+        Enum(InvitationStatus, name="invitation_status", schema=DESKCONN_SCHEMA),
+        nullable=False,
+        default=InvitationStatus.pending.value,
     )
 
     accepted_at = mapped_column(DateTime(timezone=True))

@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: deskconn-account-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      ACCOUNT_SERVICE_DB_USER: ${ACCOUNT_SERVICE_DB_USER:-account-service}
+      ACCOUNT_SERVICE_DB_PASSWORD: ${ACCOUNT_SERVICE_DB_PASSWORD:-random}
+      ROUTER_DB_USER: ${ROUTER_DB_USER:-router}
+      ROUTER_DB_PASSWORD: ${ROUTER_DB_PASSWORD:-random}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+
+volumes:
+  postgres_data:

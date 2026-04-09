@@ -121,7 +121,7 @@ class DesktopUpdate(BaseModel):
 class DesktopAccessGrant(BaseModel):
     id: UUID4
     invitee: EmailStr
-    role: AllowedInviteRoles
+    role: Literal[models.DesktopAccessRole.admin, models.DesktopAccessRole.member]
 
 
 class DesktopAccessGet(BaseModel):
@@ -136,7 +136,7 @@ class OrganizationMemberGet(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     user_id: UUIDStr
-    role: models.OrganizationRole
+    role: models.OrganizationMemberRole
     user: UserGet
 
 
@@ -169,16 +169,10 @@ class OrganizationUpdate(OrganizationDelete):
     name: str | None = None
 
 
-AllowedInviteRoles = Literal[
-    models.OrganizationRole.admin,
-    models.OrganizationRole.member,
-]
-
-
 class OrganizationInviteCreate(BaseModel):
     organization_id: UUID
     email: EmailStr
-    role: AllowedInviteRoles
+    role: Literal[models.OrganizationInviteRole.admin, models.OrganizationInviteRole.member]
     expires_in_hours: int = Field(default=72, ge=1, le=168)
 
 
@@ -187,7 +181,7 @@ class OrganizationInviteGet(BaseModel):
 
     id: UUIDStr
     organization_id: UUIDStr
-    role: models.OrganizationRole
+    role: models.OrganizationInviteRole
     status: models.InvitationStatus
     expires_at: DateTimeStr
     created_at: DateTimeStr

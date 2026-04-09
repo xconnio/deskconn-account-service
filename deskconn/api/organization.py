@@ -174,8 +174,7 @@ async def respond_organization_invitation(
     if db_invitation.status != models.InvitationStatus.pending:
         raise ApplicationError(uris.ERROR_INVITATION_INVALID, "Invitation is invalid")
 
-    # setting tzinfo to none because sqlite doesn't store timezone
-    if db_invitation.expires_at < helpers.utcnow().replace(tzinfo=None):
+    if db_invitation.expires_at < helpers.utcnow():
         await organization_backend.change_invitation_status(db, db_invitation, models.InvitationStatus.expired)
 
         raise ApplicationError(uris.ERROR_INVITATION_EXPIRED, "Invitation is expired")

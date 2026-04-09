@@ -20,7 +20,7 @@ async def create_desktop(
     await db.commit()
     await db.refresh(db_desktop)
 
-    await grant_access_to_desktop(db, db_desktop.id, org_membership.id, models.OrganizationRole.owner)
+    await grant_access_to_desktop(db, db_desktop.id, org_membership.id, models.DesktopAccessRole.owner)
 
     return db_desktop
 
@@ -59,7 +59,7 @@ async def get_user_desktops(db: AsyncSession, user_id: UUID, name: str | None = 
 
 async def get_user_desktops_authid_with_authrole(
     db: AsyncSession, user_id: UUID
-) -> Sequence[str, models.OrganizationRole]:
+) -> Sequence[str, models.DesktopAccessRole]:
     stmt = (
         select(models.Desktop.authid, models.DesktopAccess.role)
         .join(models.Desktop.accesses)
@@ -121,7 +121,7 @@ async def desktop_access_exists(db: AsyncSession, desktop_id: UUID, member_id: U
 
 
 async def grant_access_to_desktop(
-    db: AsyncSession, desktop_id: UUID, member_id: UUID, role: models.OrganizationRole
+    db: AsyncSession, desktop_id: UUID, member_id: UUID, role: models.DesktopAccessRole
 ) -> models.DesktopAccess:
     db_desktop_access = models.DesktopAccess(desktop_id=desktop_id, member_id=member_id, role=role)
     db.add(db_desktop_access)
