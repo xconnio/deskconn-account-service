@@ -1,3 +1,5 @@
+import uuid
+
 from xconn import Component, uris as xconn_uris
 from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,11 +43,11 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
             f"Desktop with name '{rs.name}' already exists in organization with ID '{db_organization.id}'",
         )
 
-    realm = f"io.xconn.deskconn.{db_organization_membership.organization_id}.{rs.authid}"
+    realm = str(uuid.uuid4())
 
     # call router rpc to add realm
     await helpers.call_cloud_router_rpc(
-        component.session, PROCEDURE_ADD_REALM, [realm], "Got error upon creating realm for desktop"
+        component.session, PROCEDURE_ADD_REALM, [realm, rs.authid], "Got error upon creating realm for desktop"
     )
 
     desktop = await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
@@ -104,7 +106,10 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
 
     # call router rpc to remove realm
     await helpers.call_cloud_router_rpc(
-        component.session, PROCEDURE_REMOVE_REALM, [db_desktop.realm], "Got error upon deleting realm for desktop"
+        component.session,
+        PROCEDURE_REMOVE_REALM,
+        [db_desktop.realm, db_desktop.authid],
+        "Got error upon deleting realm for desktop",
     )
 
     await desktop_backend.delete_desktop(db, db_desktop)
