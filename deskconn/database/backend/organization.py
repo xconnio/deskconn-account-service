@@ -16,7 +16,7 @@ async def create_organization(
 ) -> models.Organization:
     db_organization = models.Organization(name=data.name, owner_id=user.id)
 
-    db_organization.members.append(models.OrganizationMember(user_id=user.id, role=models.OrganizationRole.owner))
+    db_organization.members.append(models.OrganizationMember(user_id=user.id, role=models.OrganizationMemberRole.owner))
 
     db.add(db_organization)
     await db.commit()

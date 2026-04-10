@@ -2,11 +2,12 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from deskconn import models
+from deskconn.models import DESKCONN_SCHEMA
 from deskconn.database.database import DATABASE_URL
 
 config = context.config
@@ -38,7 +39,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        render_as_batch=True,
+        include_schemas=True,
+        version_table_schema=DESKCONN_SCHEMA,
     )
 
     with context.begin_transaction():
@@ -49,11 +51,13 @@ def do_run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        compare_type=connection.dialect.name != "sqlite",
-        render_as_batch=True,
+        compare_type=True,
+        include_schemas=True,
+        version_table_schema=DESKCONN_SCHEMA,
     )
 
     with context.begin_transaction():
+        connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {DESKCONN_SCHEMA}"))
         context.run_migrations()
 
 

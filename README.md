@@ -19,11 +19,19 @@ make setup
 Create or edit the `.env` file with appropriate values:
 
 ```dotenv
-DESKCONN_DBPATH=deskconn.db
+ACCOUNT_SERVICE_DB_USER=account-service-password
+ACCOUNT_SERVICE_DB_PASSWORD=random
+ROUTER_DB_USER=router
+ROUTER_DB_PASSWORD=router-password
+DESKCONN_DATABASE_URL="postgresql+asyncpg://${ACCOUNT_SERVICE_DB_USER}:${ACCOUNT_SERVICE_DB_PASSWORD}@localhost:5432/deskconn_account_service"
 DESKCONN_ACCOUNT_AUTHID=deskconn-account-service
 DESKCONN_ACCOUNT_PRIVATE_KEY=db3f6235591a98b704f87f46f66d74645864479f32446a32d95c4826a6791b0a
-DESKCONN_EMAIL=email
-DESKCONN_PASSWORD=password
+```
+
+3. Start Postgres and apply migrations:
+
+```shell
+make db
 ```
 
 ## Running the Service
