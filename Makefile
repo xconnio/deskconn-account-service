@@ -1,4 +1,8 @@
 .PHONY: setup db down
+
+IMAGE := xconnio/deskconn-account-service
+VERSION := $(shell git describe --tags --always)
+
 -include .env
 export $(shell sed 's/=.*//' .env 2>/dev/null || true)
 
@@ -36,7 +40,7 @@ run:
 	$(call check_defined,$(REQUIRED_VARS))
 	./.venv/bin/xcorn main:app \
 		--realm io.xconn.deskconn \
-		--url ws://localhost:8080/ws \
+		--url $(ROUTER_URL) \
 		--authid $(DESKCONN_ACCOUNT_AUTHID) \
 		--private-key $(DESKCONN_ACCOUNT_PRIVATE_KEY)
 
@@ -54,3 +58,9 @@ db:
 
 down:
 	docker compose down -v
+
+build-docker:
+	docker build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
+
+run-docker:
+	docker compose up deskconn-account-service
