@@ -57,7 +57,7 @@ db:
 	$(MAKE) migrate
 
 down:
-	docker compose down -v
+	docker compose down
 
 build-docker:
 	docker build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .

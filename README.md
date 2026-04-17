@@ -27,8 +27,13 @@ DESKCONN_POSTGRES_HOST=localhost
 DESKCONN_DATABASE_URL=postgresql+asyncpg://${ACCOUNT_SERVICE_DB_USER}:${ACCOUNT_SERVICE_DB_PASSWORD}@${DESKCONN_POSTGRES_HOST}:5432/deskconn_account_service
 DESKCONN_ACCOUNT_AUTHID=deskconn-account-service
 DESKCONN_ACCOUNT_PRIVATE_KEY=db3f6235591a98b704f87f46f66d74645864479f32446a32d95c4826a6791b0a
+RESEND_API_KEY=your-resend-api-key
+COTURN_SECRET=your-coturn-secret
 ROUTER_URL=ws://localhost:8080/ws
 ```
+
+> **Debug mode:** Set `X_DEBUG=true` to skip email sending and print OTPs to stdout instead. When enabled, `RESEND_API_KEY` is not required. Useful for local development.
+
 
 3. Start Postgres and apply migrations:
 
