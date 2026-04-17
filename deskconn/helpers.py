@@ -36,11 +36,13 @@ RPC_KILL_SESSION = "wamp.session.kill_by_authid"
 TOPIC_KEY_ADD = "io.xconn.deskconn.desktop.{machine_id}.key.add"
 TOPIC_KEY_REMOVE = "io.xconn.deskconn.desktop.{machine_id}.key.remove"
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", None)
-if RESEND_API_KEY is None or RESEND_API_KEY == "":
-    raise ValueError("'RESEND_API_KEY' missing in environment variables.")
+X_DEBUG = os.getenv("X_DEBUG", "false").lower() in ("true", "1", "yes", "on")
 
-resend.api_key = RESEND_API_KEY
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", None)
+if not X_DEBUG:
+    if RESEND_API_KEY is None or RESEND_API_KEY == "":
+        raise ValueError("'RESEND_API_KEY' missing in environment variables.")
+    resend.api_key = RESEND_API_KEY
 
 COTURN_SECRET = os.getenv("COTURN_SECRET", None)
 if COTURN_SECRET is None or COTURN_SECRET == "":
@@ -128,6 +130,11 @@ def send_user_verification_email(user_email: str, code: str) -> None:
 
 
 def send_email(params: resend.Emails.SendParams) -> None:
+    if X_DEBUG:
+        print("-------------------------------------")
+        print(f"[X_DEBUG] OTP email to {params['to']}: {params['text']}")
+        print("-------------------------------------")
+        return
     try:
         resend.Emails.send(params)
     except Exception as e:
