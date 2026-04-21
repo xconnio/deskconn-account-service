@@ -102,3 +102,6 @@ async def reset_password(rs: schemas.PasswordReset, db: AsyncSession = Depends(g
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
 
     await user_backend.reset_password(db, db_user, rs.password)
+
+    if not db_user.is_verified:
+        await user_backend.verify_user(db, db_user)
