@@ -9,6 +9,7 @@ from deskconn.api.desktop import component as desktop_component
 from deskconn.api.principal import component as principal_component
 from deskconn.api.organization import component as organization_component
 from deskconn.api.update import component as update_component
+from deskconn.api.migrate import component as migrate_component
 
 
 app = App()
@@ -23,4 +24,5 @@ app.include_component(desktop_component)
 app.include_component(principal_component)
 app.include_component(organization_component)
 app.include_component(update_component)
+app.include_component(migrate_component)
 app.set_schema_procedure("io.xconn.deskconn.account.schema.get")

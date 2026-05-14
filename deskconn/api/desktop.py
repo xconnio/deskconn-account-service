@@ -5,7 +5,7 @@ from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from xconn.types import Depends, CallDetails
 
-from deskconn import schemas, uris, helpers
+from deskconn import schemas, uris, models, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import desktop as desktop_backend
@@ -24,35 +24,22 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
     if await desktop_backend.desktop_exists_by_authid(db, rs.authid):
-        raise ApplicationError(uris.ERROR_DESKTOP_EXISTS, f"Desktop with device id '{rs.authid}' already exists")
+        raise ApplicationError(uris.ERROR_DESKTOP_EXISTS, f"Desktop with authid '{rs.authid}' already exists")
 
-    db_organization = await organization_backend.get_owner_organization_by_id(db, rs.organization_id, db_user.id)
-    if db_organization is None:
-        raise ApplicationError(
-            uris.ERROR_ORGANIZATION_NOT_FOUND,
-            f"Organization with uuid '{rs.organization_id}' not found",
-        )
-
-    db_organization_membership = await organization_backend.get_organization_membership(db, rs.organization_id, db_user)
-    if db_organization_membership is None:
-        raise ApplicationError(uris.ERROR_INTERNAL_ERROR, "Organization membership not found")
-
-    if await desktop_backend.desktop_name_unique_in_organization(db, rs.name, db_organization.id):
+    if await desktop_backend.desktop_name_unique_for_user(db, rs.name, db_user.id):
         raise ApplicationError(
             uris.ERROR_DESKTOP_EXISTS,
-            f"Desktop with name '{rs.name}' already exists in organization with ID '{db_organization.id}'",
+            f"Desktop with name '{rs.name}' already exists for this user",
         )
 
     realm = str(uuid.uuid4())
 
-    # call router rpc to add realm
     await helpers.call_cloud_router_rpc(
         component.session, PROCEDURE_ADD_REALM, [realm, rs.authid], "Got error upon creating realm for desktop"
     )
 
-    desktop = await desktop_backend.create_desktop(db, rs, db_user, db_organization_membership, realm)
+    desktop = await desktop_backend.create_desktop(db, rs, db_user, realm)
 
-    # publish new keys to desktops
     desktop_authorizations = await desktop_backend.get_user_desktops_authid_with_authrole(db, db_user.id)
     for desktop_authid, authrole in desktop_authorizations:
         await component.session.publish(
@@ -64,7 +51,7 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     return desktop
 
 
-@component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopWithOrganization)
+@component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)
 async def list_desktops(rs: schemas.DesktopList, details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
@@ -86,7 +73,7 @@ async def update(rs: schemas.DesktopUpdate, details: CallDetails, db: AsyncSessi
 
     db_desktop = await desktop_backend.get_user_desktop_by_id(db, rs.id, db_user)
     if db_desktop is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"Desktop with id '{rs.id}' not found")
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.id}' not found")
 
     return await desktop_backend.update_desktop(db, db_desktop, data)
 
@@ -102,9 +89,8 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
         raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with authid '{rs.authid}' not found")
 
     if db_desktop.user_id != db_user.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot detach a desktop from another user")
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot detach a desktop owned by another user")
 
-    # call router rpc to remove realm
     await helpers.call_cloud_router_rpc(
         component.session,
         PROCEDURE_REMOVE_REALM,
@@ -112,59 +98,300 @@ async def detach(rs: schemas.DesktopDetach, details: CallDetails, db: AsyncSessi
         "Got error upon deleting realm for desktop",
     )
 
+    detached_authid = db_desktop.authid
+    detached_public_key = db_desktop.public_key
+
+    remaining_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
+
     await desktop_backend.delete_desktop(db, db_desktop)
 
     await component.session.publish(
-        helpers.TOPIC_DESKTOP_DETACH.format(machine_id=db_desktop.authid), options={"acknowledge": True}
+        helpers.TOPIC_DESKTOP_DETACH.format(machine_id=detached_authid), options={"acknowledge": True}
     )
 
     await helpers.call_cloud_router_rpc(
-        component.session, helpers.RPC_KILL_SESSION, [db_desktop.authid], "Got error upon killing session for desktop"
+        component.session, helpers.RPC_KILL_SESSION, [detached_authid], "Got error upon killing session for desktop"
     )
 
-    # publish keys removal to desktops
-    db_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
-    for desktop in db_desktops:
+    for desktop in remaining_desktops:
+        if desktop.authid == detached_authid:
+            continue
         await component.session.publish(
             helpers.TOPIC_KEY_REMOVE.format(machine_id=desktop.authid),
-            [{db_desktop.authid: [db_desktop.public_key]}],
+            [{detached_authid: [detached_public_key]}],
             options={"acknowledge": True},
         )
 
 
-@component.register("io.xconn.deskconn.desktop.access.grant", response_model=schemas.DesktopAccessGet)
-async def access(rs: schemas.DesktopAccessGrant, details: CallDetails, db: AsyncSession = Depends(get_database)):
+# --- Desktop invitations ---
+
+@component.register(
+    "io.xconn.deskconn.desktop.invitation.user.create", response_model=schemas.DesktopInviteGet
+)
+async def invite_user(
+    rs: schemas.DesktopUserInviteCreate, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
     inviter = await user_backend.get_user_by_email(db, details.authid)
     if inviter is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    invitee = await user_backend.get_user_by_email(db, str(rs.invitee))
+    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
+
+    if db_desktop.user_id != inviter.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can send invitations")
+
+    invitee = await user_backend.get_user_by_email(db, str(rs.email))
     if invitee is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.invitee}' not found")
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
 
     if inviter.id == invitee.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot access grant to yourself")
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot invite yourself")
 
-    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.id)
-    if db_desktop is None:
-        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.id}' not found")
-
-    db_organization_membership = await organization_backend.get_organization_membership(
-        db, db_desktop.organization_id, invitee
-    )
-    if db_organization_membership is None:
-        raise ApplicationError(
-            uris.ERROR_ORGANIZATION_NOT_FOUND,
-            f"Membership for organization with uuid '{db_desktop.organization_id}' not found",
-        )
-
-    if db_organization_membership.organization.owner_id != inviter.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "User is not authorized to access this organization")
-
-    if await desktop_backend.desktop_access_exists(db, db_desktop.id, db_organization_membership.id):
+    if await desktop_backend.user_access_exists(db, db_desktop.id, invitee.id):
         raise ApplicationError(uris.ERROR_USER_ALREADY_MEMBER, "User already has access to this desktop")
 
-    return await desktop_backend.grant_access_to_desktop(db, db_desktop.id, db_organization_membership.id, rs.role)
+    if await desktop_backend.get_pending_user_invite(db, db_desktop.id, invitee.id) is not None:
+        raise ApplicationError(uris.ERROR_INVITATION_ALREADY_SENT, f"Invitation already sent to '{rs.email}'")
+
+    invite = await desktop_backend.create_desktop_invite(
+        db, inviter, db_desktop, rs.role, rs.expires_in_hours, invitee_user=invitee
+    )
+
+    helpers.send_desktop_invite_email(inviter.email, invitee.email)
+
+    return invite
+
+
+@component.register(
+    "io.xconn.deskconn.desktop.access.organization.grant", response_model=schemas.DesktopOrganizationAccessGet
+)
+async def grant_organization_access(
+    rs: schemas.DesktopOrganizationAccessGrant, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
+
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can grant access")
+
+    db_organization = await organization_backend.get_organization_by_id(db, rs.organization_id)
+    if db_organization is None:
+        raise ApplicationError(uris.ERROR_ORGANIZATION_NOT_FOUND, f"Organization '{rs.organization_id}' not found")
+
+    if db_organization.owner_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the organization owner can grant organization access")
+
+    if await desktop_backend.org_access_exists(db, db_desktop.id, db_organization.id):
+        raise ApplicationError(uris.ERROR_USER_ALREADY_MEMBER, "Organization already has access to this desktop")
+
+    return await desktop_backend.grant_org_access(db, db_desktop.id, db_organization.id, models.DesktopAccessRole.member)
+
+
+@component.register(
+    "io.xconn.deskconn.desktop.invitation.inbox.list", response_model=schemas.DesktopInviteInboxGet
+)
+async def list_inbox_invitations(details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    return await desktop_backend.list_desktop_invites_inbox(db, db_user)
+
+
+@component.register(
+    "io.xconn.deskconn.desktop.invitation.outbox.list", response_model=schemas.DesktopInviteGet
+)
+async def list_outbox_invitations(details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    return await desktop_backend.list_desktop_invites_outbox(db, db_user)
+
+
+@component.register("io.xconn.deskconn.desktop.invitation.respond", response_model=schemas.DesktopUserAccessGet)
+async def respond_invitation(
+    rs: schemas.DesktopInviteRespond, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    invite = await desktop_backend.get_desktop_invite_by_id(db, rs.invitation_id)
+    if invite is None:
+        raise ApplicationError(uris.ERROR_INVITATION_NOT_FOUND, f"Invitation '{rs.invitation_id}' not found")
+
+    if invite.invitee_user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Not authorized to respond to this invitation")
+
+    if invite.status != models.InvitationStatus.pending:
+        raise ApplicationError(uris.ERROR_INVITATION_INVALID, "Invitation is no longer pending")
+
+    if invite.expires_at < helpers.utcnow():
+        await desktop_backend.change_desktop_invite_status(db, invite, models.InvitationStatus.expired)
+        raise ApplicationError(uris.ERROR_INVITATION_EXPIRED, "Invitation has expired")
+
+    return await desktop_backend.respond_to_desktop_user_invite(db, invite, rs.status)
+
+
+
+# --- Access role management ---
+
+@component.register(
+    "io.xconn.deskconn.desktop.access.user.set", response_model=schemas.DesktopUserAccessGet
+)
+async def set_user_access(
+    rs: schemas.DesktopUserAccessSet, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
+
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can set access roles")
+
+    if rs.user_id == db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot change the owner's role")
+
+    return await desktop_backend.set_user_access(db, rs.desktop_id, rs.user_id, rs.role)
+
+
+@component.register(
+    "io.xconn.deskconn.desktop.access.user.update", response_model=schemas.DesktopUserAccessGet
+)
+async def update_user_access_role(
+    rs: schemas.DesktopAccessRoleUpdate, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_access = await desktop_backend.get_user_access_by_id(db, rs.access_id)
+    if db_access is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_ACCESS_NOT_FOUND, f"Access record '{rs.access_id}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, db_access.desktop_id)
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can change access roles")
+
+    if db_access.role == models.DesktopAccessRole.owner:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot change the owner's role")
+
+    return await desktop_backend.update_user_access_role(db, db_access, rs.role)
+
+
+@component.register(
+    "io.xconn.deskconn.desktop.access.organization.update", response_model=schemas.DesktopOrganizationAccessGet
+)
+async def update_org_access_role(
+    rs: schemas.DesktopAccessRoleUpdate, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_access = await desktop_backend.get_org_access_by_id(db, rs.access_id)
+    if db_access is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_ACCESS_NOT_FOUND, f"Access record '{rs.access_id}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, db_access.desktop_id)
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can change access roles")
+
+    return await desktop_backend.update_org_access_role(db, db_access, rs.role)
+
+
+@component.register("io.xconn.deskconn.desktop.access.user.revoke")
+async def revoke_user_access(
+    rs: schemas.DesktopAccessRevoke, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_access = await desktop_backend.get_user_access_by_id(db, rs.access_id)
+    if db_access is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_ACCESS_NOT_FOUND, f"Access record '{rs.access_id}' not found")
+
+    if db_access.role == models.DesktopAccessRole.owner:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot revoke the owner's access")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, db_access.desktop_id)
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can revoke access")
+
+    await desktop_backend.revoke_user_access(db, db_access)
+
+
+@component.register("io.xconn.deskconn.desktop.access.organization.revoke")
+async def revoke_org_access(
+    rs: schemas.DesktopAccessRevoke, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_access = await desktop_backend.get_org_access_by_id(db, rs.access_id)
+    if db_access is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_ACCESS_NOT_FOUND, f"Access record '{rs.access_id}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, db_access.desktop_id)
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can revoke access")
+
+    await desktop_backend.revoke_org_access(db, db_access)
+
+
+@component.register(
+    "io.xconn.deskconn.desktop.access.user.list", response_model=schemas.DesktopUserAccessDetailGet
+)
+async def list_user_accesses(
+    rs: schemas.DesktopAccessListRequest, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
+
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can view the access list")
+
+    return await desktop_backend.list_user_accesses(db, db_desktop.id)
+
+
+@component.register(
+    "io.xconn.deskconn.desktop.access.organization.list",
+    response_model=schemas.DesktopOrganizationAccessDetailGet,
+)
+async def list_org_accesses(
+    rs: schemas.DesktopAccessListRequest, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
+
+    if db_desktop.user_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can view the access list")
+
+    return await desktop_backend.list_org_accesses(db, db_desktop.id)
 
 
 @component.register("io.xconn.deskconn.desktop.access.key.list")
