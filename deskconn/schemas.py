@@ -88,7 +88,6 @@ class DeviceGet(DeviceCreate):
 class DesktopCreate(BaseModel):
     authid: str
     public_key: PublicKeyHex
-    organization_id: UUID4
     name: str
 
 
@@ -100,12 +99,8 @@ class DesktopGet(DesktopCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUIDStr
-    organization_id: UUIDStr
     realm: str
-
-
-class DesktopWithOrganization(DesktopGet):
-    organization: OrganizationGet
+    user_id: UUIDStr
 
 
 class DesktopDetach(BaseModel):
@@ -118,18 +113,75 @@ class DesktopUpdate(BaseModel):
     name: str | None = None
 
 
-class DesktopAccessGrant(BaseModel):
-    id: UUID4
-    invitee: EmailStr
+class DesktopUserInviteCreate(BaseModel):
+    desktop_id: UUID4
+    email: EmailStr
     role: Literal[models.DesktopAccessRole.admin, models.DesktopAccessRole.member]
+    expires_in_hours: int = Field(default=72, ge=1, le=168)
 
 
-class DesktopAccessGet(BaseModel):
+class DesktopOrganizationAccessGrant(BaseModel):
+    desktop_id: UUID4
+    organization_id: UUID4
+
+
+class DesktopInviteGet(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUIDStr
     desktop_id: UUIDStr
+    role: models.DesktopAccessRole
+    status: models.InvitationStatus
+    expires_at: DateTimeStr
     created_at: DateTimeStr
+    invitee_user_id: UUIDStr | None = None
+    invitee_organization_id: UUIDStr | None = None
+
+
+DesktopInviteRespondStatus = Literal[
+    models.InvitationStatus.accepted,
+    models.InvitationStatus.rejected,
+]
+
+
+class DesktopInviteRespond(BaseModel):
+    invitation_id: UUID4
+    status: DesktopInviteRespondStatus
+
+
+class DesktopUserAccessGet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    desktop_id: UUIDStr
+    user_id: UUIDStr
+    role: models.DesktopAccessRole
+    created_at: DateTimeStr
+
+
+class DesktopOrganizationAccessGet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    desktop_id: UUIDStr
+    organization_id: UUIDStr
+    role: models.DesktopAccessRole
+    created_at: DateTimeStr
+
+
+class DesktopAccessRoleUpdate(BaseModel):
+    access_id: UUID4
+    role: Literal[models.DesktopAccessRole.admin, models.DesktopAccessRole.member]
+
+
+class DesktopAccessRevoke(BaseModel):
+    access_id: UUID4
+
+
+class DesktopUserAccessSet(BaseModel):
+    desktop_id: UUID4
+    user_id: UUID4
+    role: Literal[models.DesktopAccessRole.admin, models.DesktopAccessRole.member]
 
 
 class OrganizationMemberGet(BaseModel):
@@ -148,6 +200,12 @@ class OrganizationMemberList(BaseModel):
 
     owner: UserGet
     members: list[OrganizationMemberGet] = []
+
+
+class OrganizationMemberRoleUpdate(BaseModel):
+    organization_id: UUID4
+    user_id: UUID4
+    role: Literal[models.OrganizationMemberRole.admin, models.OrganizationMemberRole.member]
 
 
 class OrganizationCreate(BaseModel):
@@ -185,6 +243,7 @@ class OrganizationInviteGet(BaseModel):
     status: models.InvitationStatus
     expires_at: DateTimeStr
     created_at: DateTimeStr
+    invitee_id: UUIDStr | None = None
 
 
 OrganizationRespondStatus = Literal[
@@ -196,6 +255,19 @@ OrganizationRespondStatus = Literal[
 class OrganizationInviteRespond(BaseModel):
     invitation_id: UUID4
     status: OrganizationRespondStatus
+
+
+class OrganizationInviteInboxGet(OrganizationInviteGet):
+    organization: OrganizationGet
+
+
+class OrganizationInviteOutboxGet(OrganizationInviteGet):
+    invitee: UserGet
+
+
+class OrganizationMemberRemove(BaseModel):
+    organization_id: UUID4
+    user_id: UUID4
 
 
 class PrincipalCreate(BaseModel):
@@ -254,3 +326,26 @@ class CoturnCredentials(BaseModel):
     credential: str
     expires_at: int
     urls: list[str]
+
+
+class DesktopBasicGet(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUIDStr
+    name: str
+
+
+class DesktopInviteInboxGet(DesktopInviteGet):
+    desktop: DesktopBasicGet
+
+
+class DesktopAccessListRequest(BaseModel):
+    desktop_id: UUID4
+
+
+class DesktopUserAccessDetailGet(DesktopUserAccessGet):
+    user: UserGet
+
+
+class DesktopOrganizationAccessDetailGet(DesktopOrganizationAccessGet):
+    organization: OrganizationGet

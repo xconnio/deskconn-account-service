@@ -146,6 +146,7 @@ async def get_organization_invitation(
         models.OrganizationInvite.organization_id == organization_id,
         models.OrganizationInvite.invitee_id == invitee_id,
         models.OrganizationInvite.expires_at > helpers.utcnow(),
+        models.OrganizationInvite.status != models.InvitationStatus.accepted,
     )
     result = await db.execute(stmt)
 
@@ -188,23 +189,54 @@ async def respond_to_invitation(
 async def list_inbox_invitation(db: AsyncSession, user: models.User) -> Sequence[models.OrganizationInvite]:
     stmt = (
         select(models.OrganizationInvite)
+        .options(joinedload(models.OrganizationInvite.organization))
         .where(models.OrganizationInvite.invitee_id == user.id)
         .where(models.OrganizationInvite.status == models.InvitationStatus.pending)
     )
 
     result = await db.execute(stmt)
-    return result.scalars().all()
+    return result.scalars().unique().all()
 
 
 async def list_outbox_invitation(db: AsyncSession, user: models.User) -> Sequence[models.OrganizationInvite]:
     stmt = (
         select(models.OrganizationInvite)
+        .options(joinedload(models.OrganizationInvite.invitee))
         .where(models.OrganizationInvite.inviter_id == user.id)
         .where(models.OrganizationInvite.status == models.InvitationStatus.pending)
     )
 
     result = await db.execute(stmt)
-    return result.scalars().all()
+    return result.scalars().unique().all()
+
+
+async def update_member_role(
+    db: AsyncSession, organization_id: UUID, user_id: UUID, role: models.OrganizationMemberRole
+) -> models.OrganizationMember | None:
+    stmt = (
+        select(models.OrganizationMember)
+        .options(joinedload(models.OrganizationMember.user))
+        .where(
+            models.OrganizationMember.organization_id == organization_id,
+            models.OrganizationMember.user_id == user_id,
+        )
+    )
+    result = await db.execute(stmt)
+    member = result.scalar()
+    if member:
+        member.role = role
+        await db.commit()
+        await db.refresh(member)
+    return member
+
+
+async def remove_member(db: AsyncSession, organization_id: UUID, user_id: UUID) -> None:
+    stmt = delete(models.OrganizationMember).where(
+        models.OrganizationMember.organization_id == organization_id,
+        models.OrganizationMember.user_id == user_id,
+    )
+    await db.execute(stmt)
+    await db.commit()
 
 
 async def delete_user_organizations(db: AsyncSession, db_user: models.User) -> None:

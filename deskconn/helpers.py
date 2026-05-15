@@ -141,6 +141,18 @@ def send_email(params: resend.Emails.SendParams) -> None:
         print("Failed to send email, reason:", e)
 
 
+def send_desktop_invite_email(inviter: str, invitee: str):
+    params: resend.Emails.SendParams = {
+        "from": "Deskconn <noreply@deskconn.com>",
+        "to": [invitee],
+        "subject": "Desktop Access Invitation",
+        "text": f"You have been invited by {inviter} to access a desktop.",
+    }
+
+    thread = threading.Thread(target=send_email, args=(params,))
+    thread.start()
+
+
 def send_organization_invite_email(inviter: str, invitee: str):
     params: resend.Emails.SendParams = {
         "from": "Deskconn <noreply@deskconn.com>",

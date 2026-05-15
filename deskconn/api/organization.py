@@ -133,7 +133,7 @@ async def create_organization_invitation(
 
 
 @component.register(
-    "io.xconn.deskconn.organization.invitation.inbox.list", response_model=schemas.OrganizationInviteGet
+    "io.xconn.deskconn.organization.invitation.inbox.list", response_model=schemas.OrganizationInviteInboxGet
 )
 async def list_inbox_invitation(details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
@@ -144,7 +144,7 @@ async def list_inbox_invitation(details: CallDetails, db: AsyncSession = Depends
 
 
 @component.register(
-    "io.xconn.deskconn.organization.invitation.outbox.list", response_model=schemas.OrganizationInviteGet
+    "io.xconn.deskconn.organization.invitation.outbox.list", response_model=schemas.OrganizationInviteOutboxGet
 )
 async def list_outbox_invitation(details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
@@ -183,3 +183,51 @@ async def respond_organization_invitation(
     organization_membership.user = db_user
 
     return organization_membership
+
+
+@component.register(
+    "io.xconn.deskconn.organization.member.role.update", response_model=schemas.OrganizationMemberGet
+)
+async def update_member_role(
+    rs: schemas.OrganizationMemberRoleUpdate,
+    details: CallDetails,
+    db: AsyncSession = Depends(get_database),
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{details.authid}' not found")
+
+    db_organization = await organization_backend.get_organization_by_id(db, rs.organization_id)
+    if db_organization is None:
+        raise ApplicationError(uris.ERROR_ORGANIZATION_NOT_FOUND, f"Organization '{rs.organization_id}' not found")
+
+    if db_organization.owner_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the organization owner can change member roles")
+
+    if rs.user_id == db_organization.owner_id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot change the owner's role")
+
+    return await organization_backend.update_member_role(db, rs.organization_id, rs.user_id, rs.role)
+
+
+@component.register("io.xconn.deskconn.organization.member.remove")
+async def remove_member(
+    rs: schemas.OrganizationMemberRemove,
+    details: CallDetails,
+    db: AsyncSession = Depends(get_database),
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{details.authid}' not found")
+
+    db_organization = await organization_backend.get_organization_by_id(db, rs.organization_id)
+    if db_organization is None:
+        raise ApplicationError(uris.ERROR_ORGANIZATION_NOT_FOUND, f"Organization '{rs.organization_id}' not found")
+
+    if db_organization.owner_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the organization owner can remove members")
+
+    if rs.user_id == db_organization.owner_id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Cannot remove the organization owner")
+
+    await organization_backend.remove_member(db, rs.organization_id, rs.user_id)
