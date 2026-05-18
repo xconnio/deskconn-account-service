@@ -9,7 +9,6 @@ from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import device as device_backend
 from deskconn.database.backend import desktop as desktop_backend
 from deskconn.database.backend import principal as principal_backend
-from deskconn.database.backend import organization as organization_backend
 
 component = Component()
 
@@ -75,13 +74,7 @@ async def desktop_access(authid: str, desktop_authid: str, db: AsyncSession = De
     if db_desktop is None:
         raise ApplicationError(uris.ERROR_DEVICE_NOT_FOUND, f"Desktop with authid '{desktop_authid}' not found")
 
-    db_org_membership = await organization_backend.get_organization_membership(db, db_desktop.organization_id, db_user)
-    if db_org_membership is None:
-        raise ApplicationError(
-            uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
-        )
-
-    if not await desktop_backend.desktop_access_exists(db, db_desktop.id, db_org_membership.id):
+    if not await desktop_backend.has_desktop_access(db, db_desktop.id, db_user.id):
         raise ApplicationError(
             uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
         )
@@ -97,13 +90,7 @@ async def validate_user_connect_to_desktop(db: AsyncSession, authid: str, realm:
     if db_desktop is None:
         raise ApplicationError(uris.ERROR_DEVICE_NOT_FOUND, f"Desktop with realm '{realm}' not found")
 
-    db_org_membership = await organization_backend.get_organization_membership(db, db_desktop.organization_id, user)
-    if db_org_membership is None:
-        raise ApplicationError(
-            uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
-        )
-
-    if not await desktop_backend.desktop_access_exists(db, db_desktop.id, db_org_membership.id):
+    if not await desktop_backend.has_desktop_access(db, db_desktop.id, user.id):
         raise ApplicationError(
             uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
         )
