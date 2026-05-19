@@ -349,3 +349,15 @@ class DesktopUserAccessDetailGet(DesktopUserAccessGet):
 
 class DesktopOrganizationAccessDetailGet(DesktopOrganizationAccessGet):
     organization: OrganizationGet
+
+
+class DesktopWithRoleGet(DesktopGet):
+    role: models.DesktopAccessRole
+
+
+class DesktopInviteOutboxGet(DesktopInviteGet):
+    invitee_user: UserGet | None = None
+
+
+class InviteCancel(BaseModel):
+    invitation_id: UUID4

@@ -53,13 +53,13 @@ async def attach(rs: schemas.DesktopCreate, details: CallDetails, db: AsyncSessi
     return desktop
 
 
-@component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopGet)
+@component.register("io.xconn.deskconn.desktop.list", response_model=schemas.DesktopWithRoleGet)
 async def list_desktops(rs: schemas.DesktopList, details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
 
-    return await desktop_backend.get_user_desktops(db, db_user.id, rs.name)
+    return await desktop_backend.get_user_desktops_with_role(db, db_user.id, rs.name)
 
 
 @component.register("io.xconn.deskconn.desktop.update", response_model=schemas.DesktopGet)
@@ -133,8 +133,12 @@ async def invite_user(
     if db_desktop is None:
         raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
 
-    if db_desktop.user_id != inviter.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can send invitations")
+    inviter_access = await desktop_backend.get_user_access_by_desktop_and_user(db, db_desktop.id, inviter.id)
+    if inviter_access is None or inviter_access.role not in (
+        models.DesktopAccessRole.owner,
+        models.DesktopAccessRole.admin,
+    ):
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner or admin can send invitations")
 
     invitee = await user_backend.get_user_by_email(db, str(rs.email))
     if invitee is None:
@@ -201,7 +205,7 @@ async def list_inbox_invitations(details: CallDetails, db: AsyncSession = Depend
     return await desktop_backend.list_desktop_invites_inbox(db, db_user)
 
 
-@component.register("io.xconn.deskconn.desktop.invitation.outbox.list", response_model=schemas.DesktopInviteGet)
+@component.register("io.xconn.deskconn.desktop.invitation.outbox.list", response_model=schemas.DesktopInviteOutboxGet)
 async def list_outbox_invitations(details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
     if db_user is None:
@@ -210,7 +214,47 @@ async def list_outbox_invitations(details: CallDetails, db: AsyncSession = Depen
     return await desktop_backend.list_desktop_invites_outbox(db, db_user)
 
 
-@component.register("io.xconn.deskconn.desktop.invitation.respond", response_model=schemas.DesktopUserAccessGet)
+@component.register("io.xconn.deskconn.desktop.invitation.user.cancel")
+async def cancel_desktop_invitation(
+    rs: schemas.InviteCancel, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    invite = await desktop_backend.get_desktop_invite_by_id(db, rs.invitation_id)
+    if invite is None:
+        raise ApplicationError(uris.ERROR_INVITATION_NOT_FOUND, f"Invitation '{rs.invitation_id}' not found")
+
+    if invite.inviter_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the inviter can cancel this invitation")
+
+    if invite.status != models.InvitationStatus.pending:
+        raise ApplicationError(uris.ERROR_INVITATION_INVALID, "Invitation is no longer pending")
+
+    await desktop_backend.cancel_desktop_invite(db, invite)
+
+
+@component.register("io.xconn.deskconn.desktop.access.user.me", response_model=schemas.DesktopUserAccessGet)
+async def get_my_access(
+    rs: schemas.DesktopAccessListRequest, details: CallDetails, db: AsyncSession = Depends(get_database)
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
+    if db_desktop is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
+
+    access = await desktop_backend.get_user_access_by_desktop_and_user(db, db_desktop.id, db_user.id)
+    if access is None:
+        raise ApplicationError(uris.ERROR_DESKTOP_ACCESS_NOT_FOUND, "No access record found for this desktop")
+
+    return access
+
+
+@component.register("io.xconn.deskconn.desktop.invitation.respond")
 async def respond_invitation(
     rs: schemas.DesktopInviteRespond, details: CallDetails, db: AsyncSession = Depends(get_database)
 ):
@@ -232,7 +276,7 @@ async def respond_invitation(
         await desktop_backend.change_desktop_invite_status(db, invite, models.InvitationStatus.expired)
         raise ApplicationError(uris.ERROR_INVITATION_EXPIRED, "Invitation has expired")
 
-    return await desktop_backend.respond_to_desktop_user_invite(db, invite, rs.status)
+    await desktop_backend.respond_to_desktop_user_invite(db, invite, rs.status)
 
 
 @component.register("io.xconn.deskconn.desktop.access.user.set", response_model=schemas.DesktopUserAccessGet)
@@ -352,8 +396,14 @@ async def list_user_accesses(
     if db_desktop is None:
         raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
 
-    if db_desktop.user_id != db_user.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can view the access list")
+    requester_access = await desktop_backend.get_user_access_by_desktop_and_user(db, db_desktop.id, db_user.id)
+    if requester_access is None or requester_access.role not in (
+        models.DesktopAccessRole.owner,
+        models.DesktopAccessRole.admin,
+    ):
+        raise ApplicationError(
+            uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner or admin can view the access list"
+        )
 
     return await desktop_backend.list_user_accesses(db, db_desktop.id)
 
@@ -373,8 +423,14 @@ async def list_org_accesses(
     if db_desktop is None:
         raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
 
-    if db_desktop.user_id != db_user.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can view the access list")
+    requester_access = await desktop_backend.get_user_access_by_desktop_and_user(db, db_desktop.id, db_user.id)
+    if requester_access is None or requester_access.role not in (
+        models.DesktopAccessRole.owner,
+        models.DesktopAccessRole.admin,
+    ):
+        raise ApplicationError(
+            uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner or admin can view the access list"
+        )
 
     return await desktop_backend.list_org_accesses(db, db_desktop.id)
 
