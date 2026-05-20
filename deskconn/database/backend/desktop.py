@@ -72,17 +72,20 @@ async def get_user_desktops(db: AsyncSession, user_id: UUID, name: str | None = 
 async def get_user_desktops_authid_with_authrole(
     db: AsyncSession, user_id: UUID
 ) -> list[tuple[str, models.DesktopAccessRole]]:
-    direct = (
-        select(models.Desktop.authid.label("authid"), models.DesktopUserAccess.role.label("role"))
-        .join(models.DesktopUserAccess, models.DesktopUserAccess.desktop_id == models.Desktop.id)
-        .where(models.DesktopUserAccess.user_id == user_id)
-    )
+    desktops = await get_user_desktops_with_role(db, user_id)
+    return [(desktop.authid, desktop.role) for desktop in desktops]
+
+
+async def get_user_desktops_with_role(db: AsyncSession, user_id: UUID, name: str | None = None) -> list[models.Desktop]:
+    direct = select(
+        models.DesktopUserAccess.desktop_id.label("desktop_id"),
+        models.DesktopUserAccess.role.label("role"),
+    ).where(models.DesktopUserAccess.user_id == user_id)
 
     via_org = (
-        select(models.Desktop.authid.label("authid"), models.DesktopOrganizationAccess.role.label("role"))
-        .join(
-            models.DesktopOrganizationAccess,
-            models.DesktopOrganizationAccess.desktop_id == models.Desktop.id,
+        select(
+            models.DesktopOrganizationAccess.desktop_id.label("desktop_id"),
+            models.DesktopOrganizationAccess.role.label("role"),
         )
         .join(
             models.OrganizationMember,
@@ -91,16 +94,21 @@ async def get_user_desktops_authid_with_authrole(
         .where(models.OrganizationMember.user_id == user_id)
     )
 
-    stmt = union_all(direct, via_org)
-    result = await db.execute(stmt)
+    all_roles = union_all(direct, via_org).subquery()
 
-    # Deduplicate keeping the highest role per authid
-    best: dict[str, models.DesktopAccessRole] = {}
-    for authid, role in result.all():
-        if authid not in best or _ROLE_PRIORITY[role] > _ROLE_PRIORITY[best[authid]]:
-            best[authid] = role
+    stmt = select(models.Desktop, all_roles.c.role).join(all_roles, all_roles.c.desktop_id == models.Desktop.id)
+    if name is not None:
+        stmt = stmt.where(models.Desktop.name == name)
 
-    return list(best.items())
+    best: dict[UUID, tuple[models.Desktop, models.DesktopAccessRole]] = {}
+    for desktop, role in (await db.execute(stmt)).all():
+        if desktop.id not in best or _ROLE_PRIORITY[role] > _ROLE_PRIORITY[best[desktop.id][1]]:
+            best[desktop.id] = (desktop, role)
+
+    for desktop, role in best.values():
+        desktop.role = role
+
+    return [desktop for desktop, _ in best.values()]
 
 
 async def get_user_desktop_by_id(db: AsyncSession, desktop_id: UUID, db_user: models.User) -> models.Desktop | None:
@@ -384,14 +392,34 @@ async def list_desktop_invites_inbox(db: AsyncSession, user: models.User) -> Seq
 
 
 async def list_desktop_invites_outbox(db: AsyncSession, user: models.User) -> Sequence[models.DesktopInvite]:
-    stmt = select(models.DesktopInvite).where(
-        models.DesktopInvite.inviter_id == user.id,
-        models.DesktopInvite.status == models.InvitationStatus.pending,
+    stmt = (
+        select(models.DesktopInvite)
+        .options(joinedload(models.DesktopInvite.invitee_user))
+        .where(
+            models.DesktopInvite.inviter_id == user.id,
+            models.DesktopInvite.status == models.InvitationStatus.pending,
+        )
     )
 
     result = await db.execute(stmt)
 
-    return result.scalars().all()
+    return result.scalars().unique().all()
+
+
+async def get_user_access_by_desktop_and_user(
+    db: AsyncSession, desktop_id: UUID, user_id: UUID
+) -> models.DesktopUserAccess | None:
+    stmt = select(models.DesktopUserAccess).where(
+        models.DesktopUserAccess.desktop_id == desktop_id,
+        models.DesktopUserAccess.user_id == user_id,
+    )
+    result = await db.execute(stmt)
+    return result.scalar()
+
+
+async def cancel_desktop_invite(db: AsyncSession, invite: models.DesktopInvite) -> None:
+    await db.delete(invite)
+    await db.commit()
 
 
 async def get_desktop_access_public_keys(db: AsyncSession, desktop_id: UUID) -> list[dict[str, Any]]:

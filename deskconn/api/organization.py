@@ -111,7 +111,8 @@ async def create_organization_invitation(
             uris.ERROR_ORGANIZATION_NOT_FOUND, f"Organization with uuid '{rs.organization_id}' not found"
         )
 
-    if db_organization.owner_id != db_user.id:
+    member = await organization_backend.get_organization_membership(db, db_organization.id, db_user)
+    if member is None or member.role not in (models.OrganizationMemberRole.owner, models.OrganizationMemberRole.admin):
         raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "User not authorized to send invitations")
 
     if db_user.email == rs.email:
@@ -130,6 +131,29 @@ async def create_organization_invitation(
         )
 
     return await organization_backend.create_invite(db, db_user, db_organization, rs, invitee)
+
+
+@component.register("io.xconn.deskconn.organization.invitation.cancel")
+async def cancel_organization_invitation(
+    rs: schemas.InviteCancel,
+    details: CallDetails,
+    db: AsyncSession = Depends(get_database),
+):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{details.authid}' not found")
+
+    db_invitation = await organization_backend.get_organization_invitation_by_id(db, rs.invitation_id)
+    if db_invitation is None:
+        raise ApplicationError(uris.ERROR_INVITATION_NOT_FOUND, f"Invitation '{rs.invitation_id}' not found")
+
+    if db_invitation.inviter_id != db_user.id:
+        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the inviter can cancel this invitation")
+
+    if db_invitation.status != models.InvitationStatus.pending:
+        raise ApplicationError(uris.ERROR_INVITATION_INVALID, "Invitation is no longer pending")
+
+    await organization_backend.cancel_invitation(db, db_invitation)
 
 
 @component.register(
@@ -154,7 +178,7 @@ async def list_outbox_invitation(details: CallDetails, db: AsyncSession = Depend
     return await organization_backend.list_outbox_invitation(db, db_user)
 
 
-@component.register("io.xconn.deskconn.organization.invitation.respond", response_model=schemas.OrganizationMemberGet)
+@component.register("io.xconn.deskconn.organization.invitation.respond")
 async def respond_organization_invitation(
     rs: schemas.OrganizationInviteRespond,
     details: CallDetails,
@@ -179,10 +203,7 @@ async def respond_organization_invitation(
 
         raise ApplicationError(uris.ERROR_INVITATION_EXPIRED, "Invitation is expired")
 
-    organization_membership = await organization_backend.respond_to_invitation(db, db_invitation, rs.status)
-    organization_membership.user = db_user
-
-    return organization_membership
+    await organization_backend.respond_to_invitation(db, db_invitation, rs.status)
 
 
 @component.register("io.xconn.deskconn.organization.member.role.update", response_model=schemas.OrganizationMemberGet)

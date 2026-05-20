@@ -210,6 +210,11 @@ async def list_outbox_invitation(db: AsyncSession, user: models.User) -> Sequenc
     return result.scalars().unique().all()
 
 
+async def cancel_invitation(db: AsyncSession, invitation: models.OrganizationInvite) -> None:
+    await db.delete(invitation)
+    await db.commit()
+
+
 async def update_member_role(
     db: AsyncSession, organization_id: UUID, user_id: UUID, role: models.OrganizationMemberRole
 ) -> models.OrganizationMember | None:
