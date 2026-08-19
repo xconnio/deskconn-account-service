@@ -27,6 +27,33 @@ async def verify_cra(authid: str, realm: str, db: AsyncSession = Depends(get_dat
     return db_user
 
 
+@component.register("io.xconn.deskconn.account.login")
+async def login(email: str, password: str, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, email)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{email}' not found")
+
+    if not db_user.is_verified:
+        raise ApplicationError(uris.ERROR_USER_NOT_VERIFIED, f"User with email '{email}' is not verified")
+
+    if not helpers.verify_password(password, db_user.salt, db_user.password):
+        raise ApplicationError(uris.ERROR_AUTHENTICATION_FAILED, "Invalid email or password")
+
+    await user_backend.generate_and_save_otp(db, db_user, helpers.OTP_PURPOSE_LOGIN)
+
+
+@component.register("io.xconn.deskconn.account.login.verify")
+async def verify_login(rs: schemas.UserVerify, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, rs.email)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
+
+    if not helpers.verify_email_otp(
+        db_user.otp_hash, db_user.otp_expires_at, rs.code, db_user.otp_purpose, helpers.OTP_PURPOSE_LOGIN
+    ):
+        raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+
+
 @component.register("io.xconn.deskconn.account.cryptosign.verify")
 async def verify_cryptosign(authid: str, public_key: str, realm: str, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, authid)

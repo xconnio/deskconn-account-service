@@ -14,7 +14,7 @@ async def create_user(db: AsyncSession, data: schemas.UserCreate) -> models.User
     data.password, salt = helpers.hash_password_and_generate_salt(data.password)
     db_user = models.User(**data.model_dump(), salt=salt)
 
-    await generate_and_save_otp(db, db_user)
+    await generate_and_save_otp(db, db_user, helpers.OTP_PURPOSE_VERIFY)
 
     db.add(db_user)
     await db.commit()
@@ -63,8 +63,9 @@ async def verify_user(db: AsyncSession, db_user: models.User) -> None:
     await db.commit()
 
 
-async def generate_and_save_otp(db: AsyncSession, db_user: models.User) -> models.User:
+async def generate_and_save_otp(db: AsyncSession, db_user: models.User, purpose: str) -> models.User:
     db_user.otp_hash, db_user.otp_expires_at = helpers.generate_and_send_otp(db_user.email)
+    db_user.otp_purpose = purpose
     await db.commit()
 
     return db_user
