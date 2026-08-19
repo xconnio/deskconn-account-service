@@ -39,7 +39,7 @@ async def login(email: str, password: str, db: AsyncSession = Depends(get_databa
     if not helpers.verify_password(password, db_user.salt, db_user.password):
         raise ApplicationError(uris.ERROR_AUTHENTICATION_FAILED, "Invalid email or password")
 
-    await user_backend.generate_and_save_otp(db, db_user)
+    await user_backend.generate_and_save_otp(db, db_user, helpers.OTP_PURPOSE_LOGIN)
 
 
 @component.register("io.xconn.deskconn.account.login.verify")
@@ -48,7 +48,9 @@ async def verify_login(rs: schemas.UserVerify, db: AsyncSession = Depends(get_da
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
 
-    if not helpers.verify_email_otp(db_user.otp_hash, db_user.otp_expires_at, rs.code):
+    if not helpers.verify_email_otp(
+        db_user.otp_hash, db_user.otp_expires_at, rs.code, db_user.otp_purpose, helpers.OTP_PURPOSE_LOGIN
+    ):
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
 
 

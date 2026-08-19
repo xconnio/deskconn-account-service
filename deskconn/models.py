@@ -57,6 +57,7 @@ class User(Base):
     salt = mapped_column(Text)
     otp_hash = mapped_column(Text)
     otp_expires_at = mapped_column(DateTime(timezone=True))
+    otp_purpose = mapped_column(Text, server_default=None)
     is_verified = mapped_column(Boolean, default=False)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)

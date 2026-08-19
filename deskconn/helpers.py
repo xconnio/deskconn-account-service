@@ -28,6 +28,9 @@ ROLE_USER = "user"
 ROLE_DESKTOP = "xconnio:deskconn:desktop:{authid}"
 OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 5
+OTP_PURPOSE_VERIFY = "verify"
+OTP_PURPOSE_LOGIN = "login"
+OTP_PURPOSE_PASSWORD_RESET = "password_reset"
 DEFAULT_DESKCONN_RELEASE_BASE_URL = "https://github.com/xconnio/deskconn/releases/download"
 
 CLOUD_REALM = "io.xconn.deskconn"
@@ -104,7 +107,16 @@ def generate_and_send_otp(email: str) -> Tuple[str, datetime]:
     return otp_hash, otp_expires_at
 
 
-def verify_email_otp(stored_hash: str | None, expires_at: datetime | None, provided_code: str) -> bool:
+def verify_email_otp(
+    stored_hash: str | None,
+    expires_at: datetime | None,
+    provided_code: str,
+    stored_purpose: str | None,
+    expected_purpose: str,
+) -> bool:
+    if stored_purpose != expected_purpose:
+        return False
+
     if stored_hash is None or expires_at is None:
         return False
 
