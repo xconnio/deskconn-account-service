@@ -9,6 +9,7 @@ from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import device as device_backend
 from deskconn.database.backend import desktop as desktop_backend
 from deskconn.database.backend import principal as principal_backend
+from deskconn.api.principal import create_and_notify_principal
 
 component = Component()
 
@@ -40,7 +41,7 @@ async def login(email: str, db: AsyncSession = Depends(get_database)):
 
 
 @component.register("io.xconn.deskconn.account.login.verify")
-async def verify_login(rs: schemas.UserVerify, db: AsyncSession = Depends(get_database)):
+async def verify_login(rs: schemas.LoginVerify, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, rs.email)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
@@ -49,6 +50,8 @@ async def verify_login(rs: schemas.UserVerify, db: AsyncSession = Depends(get_da
         db_user.otp_hash, db_user.otp_expires_at, rs.code, db_user.otp_purpose, helpers.OTP_PURPOSE_LOGIN
     ):
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+
+    await create_and_notify_principal(db, schemas.PrincipalCreate(public_key=rs.public_key), db_user)
 
 
 @component.register("io.xconn.deskconn.account.cryptosign.verify")

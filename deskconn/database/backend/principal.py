@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, exists, Sequence, delete
 
-from deskconn import models, schemas
+from deskconn import models, schemas, helpers
 
 
 async def create_principal(db: AsyncSession, data: schemas.PrincipalCreate, user: models.User) -> models.Principal:
@@ -45,7 +45,12 @@ async def get_principal_by_public_key(db: AsyncSession, public_key: str, user_id
 
 
 async def user_principal_exists(db: AsyncSession, public_key: str, user: models.User) -> bool:
-    stmt = select(exists().where(models.Principal.public_key == public_key).where(models.Principal.user_id == user.id))
+    stmt = select(
+        exists()
+        .where(models.Principal.public_key == public_key)
+        .where(models.Principal.user_id == user.id)
+        .where(models.Principal.expires_at > helpers.utcnow())
+    )
     result = await db.execute(stmt)
 
     return bool(result.scalar())
