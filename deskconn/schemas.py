@@ -46,6 +46,10 @@ class UserVerify(BaseModel):
     code: str
 
 
+class LoginVerify(UserVerify):
+    public_key: PublicKeyHex
+
+
 class UserGet(User):
     model_config = ConfigDict(from_attributes=True)
 

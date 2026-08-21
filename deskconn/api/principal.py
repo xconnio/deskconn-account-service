@@ -3,7 +3,7 @@ from xconn.exception import ApplicationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from xconn.types import Depends, CallDetails
 
-from deskconn import schemas, uris, helpers
+from deskconn import schemas, uris, helpers, models
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import desktop as desktop_backend
@@ -12,12 +12,9 @@ from deskconn.database.backend import principal as principal_backend
 component = Component()
 
 
-@component.register("io.xconn.deskconn.account.principal.create", response_model=schemas.PrincipalGet)
-async def create(rs: schemas.PrincipalCreate, details: CallDetails, db: AsyncSession = Depends(get_database)):
-    db_user = await user_backend.get_user_by_email(db, details.authid)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
-
+async def create_and_notify_principal(
+    db: AsyncSession, rs: schemas.PrincipalCreate, db_user: models.User
+) -> models.Principal:
     if await principal_backend.principal_exists_by_public_key(db, rs.public_key):
         raise ApplicationError(
             uris.ERROR_PRINCIPAL_EXISTS, f"Principal with public key '{rs.public_key}' already exists"
