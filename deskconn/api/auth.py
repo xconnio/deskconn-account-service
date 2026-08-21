@@ -40,7 +40,7 @@ async def login(email: str, db: AsyncSession = Depends(get_database)):
     await user_backend.generate_and_save_otp(db, db_user, helpers.OTP_PURPOSE_LOGIN)
 
 
-@component.register("io.xconn.deskconn.account.login.verify")
+@component.register("io.xconn.deskconn.account.login.verify", response_model=schemas.PrincipalGet)
 async def verify_login(rs: schemas.LoginVerify, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, rs.email)
     if db_user is None:
@@ -51,7 +51,7 @@ async def verify_login(rs: schemas.LoginVerify, db: AsyncSession = Depends(get_d
     ):
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
 
-    await create_and_notify_principal(db, schemas.PrincipalCreate(public_key=rs.public_key), db_user)
+    return await create_and_notify_principal(db, schemas.PrincipalCreate(public_key=rs.public_key), db_user)
 
 
 @component.register("io.xconn.deskconn.account.cryptosign.verify")
