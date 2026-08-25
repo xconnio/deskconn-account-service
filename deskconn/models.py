@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Text, DateTime, Boolean, UUID, UniqueConstraint, MetaData
+from sqlalchemy import Enum, ForeignKey, Text, DateTime, Boolean, Integer, UUID, UniqueConstraint, MetaData, func
 from sqlalchemy.orm import relationship, declarative_base, mapped_column
 
 from deskconn import helpers
@@ -58,6 +58,10 @@ class User(Base):
     otp_hash = mapped_column(Text)
     otp_expires_at = mapped_column(DateTime(timezone=True))
     otp_purpose = mapped_column(Text, server_default=None)
+    otp_last_sent_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    otp_send_count = mapped_column(Integer, server_default="0")
+    otp_window_started_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    otp_verify_attempts = mapped_column(Integer, server_default="0")
     is_verified = mapped_column(Boolean, default=False)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)

@@ -68,11 +68,10 @@ async def account_verification(rs: schemas.UserVerify, db: AsyncSession = Depend
     if db_user.is_verified:
         raise ApplicationError(uris.ERROR_USER_ALREADY_VERIFIED, "User is already verified")
 
-    if not helpers.verify_email_otp(
-        db_user.otp_hash, db_user.otp_expires_at, rs.code, db_user.otp_purpose, helpers.OTP_PURPOSE_VERIFY
-    ):
-        raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+    await user_backend.verify_otp(db, db_user, rs.code, helpers.OTP_PURPOSE_VERIFY)
 
+    db_user.otp_send_count = 0
+    db_user.otp_window_started_at = None
     await user_backend.verify_user(db, db_user)
 
 
@@ -100,11 +99,10 @@ async def reset_password(rs: schemas.PasswordReset, db: AsyncSession = Depends(g
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
 
-    if not helpers.verify_email_otp(
-        db_user.otp_hash, db_user.otp_expires_at, rs.code, db_user.otp_purpose, helpers.OTP_PURPOSE_PASSWORD_RESET
-    ):
-        raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+    await user_backend.verify_otp(db, db_user, rs.code, helpers.OTP_PURPOSE_PASSWORD_RESET)
 
+    db_user.otp_send_count = 0
+    db_user.otp_window_started_at = None
     await user_backend.reset_password(db, db_user, rs.password)
 
     if not db_user.is_verified:

@@ -46,11 +46,10 @@ async def verify_login(rs: schemas.LoginVerify, db: AsyncSession = Depends(get_d
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
 
-    if not helpers.verify_email_otp(
-        db_user.otp_hash, db_user.otp_expires_at, rs.code, db_user.otp_purpose, helpers.OTP_PURPOSE_LOGIN
-    ):
-        raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+    await user_backend.verify_otp(db, db_user, rs.code, helpers.OTP_PURPOSE_LOGIN)
 
+    db_user.otp_send_count = 0
+    db_user.otp_window_started_at = None
     return await create_and_notify_principal(db, schemas.PrincipalCreate(public_key=rs.public_key), db_user)
 
 
