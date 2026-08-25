@@ -44,9 +44,6 @@ class UserUpgrade(BaseModel):
 class UserVerify(BaseModel):
     email: str
     code: str
-
-
-class LoginVerify(UserVerify):
     public_key: PublicKeyHex
 
 
