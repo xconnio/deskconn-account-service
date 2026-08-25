@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import Any
 from datetime import timezone, timedelta
 
-from sqlalchemy import select, exists, union_all
+from sqlalchemy import select, exists, union_all, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from xconn.exception import ApplicationError
 
@@ -103,9 +103,39 @@ async def generate_and_save_otp(db: AsyncSession, db_user: models.User, purpose:
     db_user.otp_purpose = purpose
     db_user.otp_last_sent_at = now
     db_user.otp_send_count = (db_user.otp_send_count or 0) + 1
+    db_user.otp_verify_attempts = 0
     await db.commit()
 
     return db_user
+
+
+async def verify_otp(db: AsyncSession, db_user: models.User, code: str, expected_purpose: str) -> None:
+    if (db_user.otp_verify_attempts or 0) >= helpers.OTP_MAX_VERIFY_ATTEMPTS:
+        raise ApplicationError(uris.ERROR_USER_OTP_TOO_MANY_ATTEMPTS, "Too many incorrect attempts, request a new OTP")
+
+    is_valid = helpers.verify_email_otp(
+        db_user.otp_hash, db_user.otp_expires_at, code, db_user.otp_purpose, expected_purpose
+    )
+    if not is_valid:
+        db_user.otp_verify_attempts = await increment_otp_verify_attempts(db, db_user)
+        await db.commit()
+        raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
+
+    db_user.otp_verify_attempts = 0
+
+
+async def increment_otp_verify_attempts(db: AsyncSession, db_user: models.User) -> int:
+    # Atomic increment (not read-modify-write) so concurrent wrong guesses can't
+    # undercount each other and let the attempt cap slip.
+    stmt = (
+        update(models.User)
+        .where(models.User.id == db_user.id)
+        .values(otp_verify_attempts=models.User.otp_verify_attempts + 1)
+        .returning(models.User.otp_verify_attempts)
+    )
+    result = await db.execute(stmt)
+
+    return result.scalar_one()
 
 
 async def reset_password(db: AsyncSession, db_user: models.User, new_password: str) -> models.User:

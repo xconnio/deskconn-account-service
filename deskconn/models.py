@@ -61,6 +61,7 @@ class User(Base):
     otp_last_sent_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     otp_send_count = mapped_column(Integer, server_default="0")
     otp_window_started_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    otp_verify_attempts = mapped_column(Integer, server_default="0")
     is_verified = mapped_column(Boolean, default=False)
 
     created_at = mapped_column(DateTime(timezone=True), default=helpers.utcnow)
