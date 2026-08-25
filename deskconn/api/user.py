@@ -7,6 +7,7 @@ from deskconn import schemas, uris, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import desktop as desktop_backend
+from deskconn.api.principal import create_and_notify_principal
 
 component = Component()
 
@@ -59,7 +60,7 @@ async def delete(details: CallDetails, db: AsyncSession = Depends(get_database))
         )
 
 
-@component.register("io.xconn.deskconn.account.verify")
+@component.register("io.xconn.deskconn.account.verify", response_model=schemas.PrincipalGet)
 async def account_verification(rs: schemas.UserVerify, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, rs.email)
     if db_user is None:
@@ -70,9 +71,13 @@ async def account_verification(rs: schemas.UserVerify, db: AsyncSession = Depend
 
     await user_backend.verify_otp(db, db_user, rs.code, helpers.OTP_PURPOSE_VERIFY)
 
+    principal = await create_and_notify_principal(db, schemas.PrincipalCreate(public_key=rs.public_key), db_user)
+
     db_user.otp_send_count = 0
     db_user.otp_window_started_at = None
     await user_backend.verify_user(db, db_user)
+
+    return principal
 
 
 @component.register("io.xconn.deskconn.account.otp.resend")

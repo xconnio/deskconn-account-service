@@ -41,7 +41,7 @@ async def login(email: str, db: AsyncSession = Depends(get_database)):
 
 
 @component.register("io.xconn.deskconn.account.login.verify", response_model=schemas.PrincipalGet)
-async def verify_login(rs: schemas.LoginVerify, db: AsyncSession = Depends(get_database)):
+async def verify_login(rs: schemas.UserVerify, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, rs.email)
     if db_user is None:
         raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with email '{rs.email}' not found")
