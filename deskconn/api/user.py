@@ -73,6 +73,8 @@ async def account_verification(rs: schemas.UserVerify, db: AsyncSession = Depend
     ):
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
 
+    db_user.otp_send_count = 0
+    db_user.otp_window_started_at = None
     await user_backend.verify_user(db, db_user)
 
 
@@ -105,6 +107,8 @@ async def reset_password(rs: schemas.PasswordReset, db: AsyncSession = Depends(g
     ):
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
 
+    db_user.otp_send_count = 0
+    db_user.otp_window_started_at = None
     await user_backend.reset_password(db, db_user, rs.password)
 
     if not db_user.is_verified:

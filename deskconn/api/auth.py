@@ -51,6 +51,8 @@ async def verify_login(rs: schemas.LoginVerify, db: AsyncSession = Depends(get_d
     ):
         raise ApplicationError(uris.ERROR_USER_OTP_INVALID, "OTP invalid or expired")
 
+    db_user.otp_send_count = 0
+    db_user.otp_window_started_at = None
     return await create_and_notify_principal(db, schemas.PrincipalCreate(public_key=rs.public_key), db_user)
 
 
