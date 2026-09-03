@@ -276,6 +276,11 @@ class PrincipalCreate(BaseModel):
     expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + relativedelta(months=1))
 
 
+class PrincipalRotate(BaseModel):
+    old_public_key: PublicKeyHex
+    new_public_key: PublicKeyHex
+
+
 class PrincipalGet(PrincipalCreate):
     model_config = ConfigDict(from_attributes=True)
 

@@ -43,6 +43,36 @@ async def list_principal(details: CallDetails, db: AsyncSession = Depends(get_da
     return await principal_backend.list_principals(db, db_user)
 
 
+@component.register("io.xconn.deskconn.account.principal.rotate", response_model=schemas.PrincipalGet)
+async def rotate(rs: schemas.PrincipalRotate, details: CallDetails, db: AsyncSession = Depends(get_database)):
+    db_user = await user_backend.get_user_by_email(db, details.authid)
+    if db_user is None:
+        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
+
+    if not await principal_backend.user_owns_principal(db, rs.old_public_key, db_user):
+        raise ApplicationError(
+            uris.ERROR_PRINCIPAL_NOT_FOUND, f"Principal with public key '{rs.old_public_key}' not found"
+        )
+
+    # create the new principal first: if the new key is already taken, the old one stays
+    # intact instead of leaving the user with neither.
+    new_principal = await create_and_notify_principal(
+        db, schemas.PrincipalCreate(public_key=rs.new_public_key), db_user
+    )
+    await principal_backend.delete_principal(db, schemas.PrincipalCreate(public_key=rs.old_public_key), db_user)
+
+    # publish old key removal to desktops
+    db_desktops = await desktop_backend.get_user_desktops(db, db_user.id)
+    for desktop in db_desktops:
+        await component.session.publish(
+            helpers.TOPIC_KEY_REMOVE.format(machine_id=desktop.authid),
+            [{db_user.email: [rs.old_public_key]}],
+            options={"acknowledge": True},
+        )
+
+    return new_principal
+
+
 @component.register("io.xconn.deskconn.account.principal.delete")
 async def delete(rs: schemas.PrincipalCreate, details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
