@@ -44,6 +44,14 @@ async def get_principal_by_public_key(db: AsyncSession, public_key: str, user_id
     return result.scalar()
 
 
+async def user_owns_principal(db: AsyncSession, public_key: str, user: models.User) -> bool:
+    # no expiry filter: rotating an already-expired key is the main reason to rotate.
+    stmt = select(exists().where(models.Principal.public_key == public_key).where(models.Principal.user_id == user.id))
+    result = await db.execute(stmt)
+
+    return bool(result.scalar())
+
+
 async def user_principal_exists(db: AsyncSession, public_key: str, user: models.User) -> bool:
     stmt = select(
         exists()
