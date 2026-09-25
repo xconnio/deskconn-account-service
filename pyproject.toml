@@ -7,7 +7,7 @@ authors = [
 description = "Deskconn Backend"
 requires-python = ">=3.12"
 dependencies = [
-    "sqlalchemy",
+    "sqlalchemy[asyncio]",
     "asyncpg",
     "python-dotenv",
     "pydantic",
