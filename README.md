@@ -51,15 +51,14 @@ make run
 
 Before running with Docker, make sure [Deskconn Router](https://github.com/xconnio/deskconn-router) is already running via its own `docker-compose.yml`.
 
-Set these values in your `.env` for Docker:
+Set these values in your `.env` for Docker (both stacks share the `deskconn` docker network):
 
 ```dotenv
-# Use the container name for postgres (same docker-compose network)
 DESKCONN_POSTGRES_HOST=deskconn-account-service-postgres
-
-# Use host.docker.internal to reach the router running on the host
-ROUTER_URL=ws://host.docker.internal:8080/ws
+ROUTER_URL=rss://deskconn-router:8084/rs
 ```
+
+> **Note:** `make db` runs migrations from the host, so keep `DESKCONN_POSTGRES_HOST=localhost` while running it.
 
 Then start the service:
 

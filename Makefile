@@ -59,8 +59,20 @@ db:
 down:
 	docker compose down
 
+DOCKER_BUILD := docker buildx build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest
+
 build-docker:
-	docker build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
+	$(DOCKER_BUILD) --platform linux/amd64,linux/arm64 .
+
+build-docker-amd64:
+	$(DOCKER_BUILD) --platform linux/amd64 .
+
+build-docker-arm64:
+	$(DOCKER_BUILD) --platform linux/arm64 .
+
+push-docker:
+	@[ "$$CI" = true ] || { echo "push-docker only runs in CI"; exit 1; }
+	$(DOCKER_BUILD) --platform linux/amd64,linux/arm64 --push .
 
 run-docker:
 	docker compose up deskconn-account-service
