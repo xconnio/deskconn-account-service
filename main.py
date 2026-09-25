@@ -3,7 +3,6 @@ from xconn.app import ExecutionMode
 
 from deskconn.api.auth import component as auth_component
 from deskconn.api.user import component as user_component
-from deskconn.api.coturn import component as coturn_component
 from deskconn.api.device import component as device_component
 from deskconn.api.desktop import component as desktop_component
 from deskconn.api.principal import component as principal_component
@@ -17,7 +16,6 @@ app.set_execution_mode(ExecutionMode.ASYNC)
 
 app.include_component(user_component)
 app.include_component(auth_component)
-app.include_component(coturn_component)
 app.include_component(device_component)
 app.include_component(desktop_component)
 app.include_component(principal_component)

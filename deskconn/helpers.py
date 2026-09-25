@@ -1,13 +1,9 @@
 import os
-import hmac
-import time
 import base64
 import secrets
 import hashlib
 import threading
-from uuid import UUID
 from typing import Tuple, Any
-from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
 import resend
@@ -22,7 +18,6 @@ load_dotenv()
 
 ITERATIONS = 1000
 KEY_LENGTH = 32
-TURN_CREDS_TTL = 3600
 
 ROLE_USER = "user"
 ROLE_DESKTOP = "xconnio:deskconn:desktop:{authid}"
@@ -50,10 +45,6 @@ if not X_DEBUG:
     if RESEND_API_KEY is None or RESEND_API_KEY == "":
         raise ValueError("'RESEND_API_KEY' missing in environment variables.")
     resend.api_key = RESEND_API_KEY
-
-COTURN_SECRET = os.getenv("COTURN_SECRET", None)
-if COTURN_SECRET is None or COTURN_SECRET == "":
-    raise ValueError("'COTURN_SECRET' missing in environment variables.")
 
 
 def utcnow():
@@ -188,20 +179,3 @@ async def call_cloud_router_rpc(session: AsyncSession, uri: str, args: list[Any]
         raise ApplicationError(uris.ERROR_INTERNAL_ERROR, f"{error_message}. Error is: {app_err.args}")
     except Exception as err:
         raise ApplicationError(uris.ERROR_INTERNAL_ERROR, str(err))
-
-
-@dataclass
-class CoturnCredentials:
-    username: str
-    credential: str
-    expires_at: int
-
-
-def generate_coturn_credentials(user_id: UUID, ttl: int = TURN_CREDS_TTL) -> CoturnCredentials:
-    expiry = int(time.time()) + ttl
-
-    username = f"{expiry}:{user_id}"
-    digest = hmac.new(COTURN_SECRET.encode(), username.encode(), hashlib.sha1).digest()
-    credential = base64.b64encode(digest).decode()
-
-    return CoturnCredentials(username=username, credential=credential, expires_at=expiry)

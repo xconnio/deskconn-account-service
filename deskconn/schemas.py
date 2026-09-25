@@ -327,13 +327,6 @@ class AppVersionGet(BaseModel):
     released_at: DateTimeStr
 
 
-class CoturnCredentials(BaseModel):
-    username: str
-    credential: str
-    expires_at: int
-    urls: list[str]
-
-
 class DesktopBasicGet(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
