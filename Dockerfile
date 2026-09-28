@@ -11,8 +11,10 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
 # Copy project files
-COPY pyproject.toml main.py /app/
+COPY pyproject.toml main.py alembic.ini /app/
 COPY deskconn/ /app/deskconn/
+COPY alembic/ /app/alembic/
+COPY docker/postgres/init/ /app/postgres-init/
 
 # Create default venv (.venv) and install project
 RUN uv venv && uv pip install . -U
