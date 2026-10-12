@@ -70,6 +70,8 @@ async def verify_cryptosign(authid: str, public_key: str, realm: str, db: AsyncS
         await validate_user_connect_to_desktop(db, authid, realm, db_user)
 
         authrole = helpers.ROLE_USER
+        if realm != helpers.CLOUD_REALM:
+            authrole = await desktop_access_role(db, realm, db_user)
     else:
         db_desktop = await desktop_backend.get_desktop_by_public_key(db, authid, public_key)
         if db_desktop is None:
@@ -120,3 +122,12 @@ async def validate_user_connect_to_desktop(db: AsyncSession, authid: str, realm:
         raise ApplicationError(
             uris.ERROR_USER_NOT_AUTHORIZED, f"User with authid '{authid}' is not authorized to access desktop"
         )
+
+
+async def desktop_access_role(db: AsyncSession, realm: str, user: models.User) -> str:
+    """Returns user:owner, user:admin or user:member: the user's best access role on the desktop."""
+    role = models.DesktopAccessRole.member
+    for desktop in await desktop_backend.get_user_desktops_with_role(db, user.id):
+        if desktop.realm == realm:
+            role = desktop.role
+    return helpers.ROLE_USER_DESKTOP.format(role=role.value)
