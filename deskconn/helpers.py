@@ -19,7 +19,10 @@ load_dotenv()
 ITERATIONS = 1000
 KEY_LENGTH = 32
 
-ROLE_USER = "user"
+# A user's role on the system realm (io.xconn.deskconn), by how they authenticated. On a
+# desktop realm they get ROLE_USER_DESKTOP instead.
+ROLE_CRA_USER = "user:cra"
+ROLE_CRYPTOSIGN_USER = "user:cryptosign"
 # A user's role on a desktop realm is user:<their access role> (user:owner, user:admin or
 # user:member). The router uses it to keep app management to owners and admins.
 ROLE_USER_DESKTOP = "user:{role}"

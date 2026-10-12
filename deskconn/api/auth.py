@@ -69,7 +69,7 @@ async def verify_cryptosign(authid: str, public_key: str, realm: str, db: AsyncS
 
         await validate_user_connect_to_desktop(db, authid, realm, db_user)
 
-        authrole = helpers.ROLE_USER
+        authrole = helpers.ROLE_CRYPTOSIGN_USER
         if realm != helpers.CLOUD_REALM:
             authrole = await desktop_access_role(db, realm, db_user)
     else:
