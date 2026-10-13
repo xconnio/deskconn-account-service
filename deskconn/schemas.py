@@ -69,7 +69,7 @@ class CRAUser(UserGet):
 
     salt: str
     password: str
-    authrole: str = helpers.ROLE_USER
+    authrole: str = helpers.ROLE_CRA_USER
     iterations: int = helpers.ITERATIONS
     key_length: int = helpers.KEY_LENGTH
 
