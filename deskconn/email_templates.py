@@ -48,7 +48,7 @@ TEMPLATES: list[resend.Templates.CreateParams] = [
             "Your verification code",
             f"""<p {_P}>Your Deskconn verification code is <strong>{{{{{{CODE}}}}}}</strong>. Enter it in the app to continue.</p>
           <div style="margin:24px 0;padding:16px;background:#f3f4f6;border-radius:6px;text-align:center;
-                      font-size:32px;font-weight:700;letter-spacing:8px;font-family:Menlo,Consolas,monospace;">{{{{{{CODE}}}}}}</div>
+                      font-size:32px;font-weight:700;letter-spacing:8px;font-family:Menlo,Consolas,monospace;-webkit-user-select:all;user-select:all;cursor:pointer;">{{{{{{CODE}}}}}}</div>
           <p {_P}>This code expires in <strong>{{{{{{EXPIRY_MINUTES}}}}}} minutes</strong>. Never share it with anyone.</p>""",
         ),
         "text": "Your Deskconn verification code is: {{{CODE}}}\n\n"
