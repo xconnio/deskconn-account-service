@@ -134,7 +134,7 @@ async def create_invite(
     await db.commit()
     await db.refresh(db_org_invitation)
 
-    helpers.send_organization_invite_email(user.email, invitee.email)
+    helpers.send_organization_invite_email(user.email, invitee.email, organization.name, data.role.value)
 
     return db_org_invitation
 

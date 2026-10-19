@@ -157,7 +157,7 @@ async def invite_user(
         db, inviter, db_desktop, rs.role, rs.expires_in_hours, invitee_user=invitee
     )
 
-    helpers.send_desktop_invite_email(inviter.email, invitee.email)
+    helpers.send_desktop_invite_email(inviter.email, invitee.email, db_desktop.name, rs.role.value)
 
     return invite
 

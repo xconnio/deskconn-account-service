@@ -36,6 +36,11 @@ OTP_MAX_VERIFY_ATTEMPTS = 5
 OTP_PURPOSE_VERIFY = "verify"
 OTP_PURPOSE_LOGIN = "login"
 OTP_PURPOSE_PASSWORD_RESET = "password_reset"
+EMAIL_FROM = "Deskconn <noreply@deskconn.com>"
+# Aliases of the Resend templates defined in deskconn/email_templates.py
+EMAIL_TEMPLATE_VERIFICATION_CODE = "deskconn-verification-code"
+EMAIL_TEMPLATE_DESKTOP_INVITE = "deskconn-desktop-invite"
+EMAIL_TEMPLATE_ORGANIZATION_INVITE = "deskconn-organization-invite"
 DEFAULT_DESKCONN_RELEASE_BASE_URL = "https://github.com/xconnio/deskconn/releases/download"
 
 CLOUD_REALM = "io.xconn.deskconn"
@@ -131,11 +136,30 @@ def verify_email_otp(
 
 
 def send_user_verification_email(user_email: str, code: str) -> None:
+    send_template_email(
+        user_email, EMAIL_TEMPLATE_VERIFICATION_CODE, {"CODE": code, "EXPIRY_MINUTES": OTP_EXPIRY_MINUTES}
+    )
+
+
+def send_desktop_invite_email(inviter: str, invitee: str, desktop_name: str, role: str) -> None:
+    send_template_email(
+        invitee, EMAIL_TEMPLATE_DESKTOP_INVITE, {"INVITER": inviter, "DESKTOP_NAME": desktop_name, "ROLE": role}
+    )
+
+
+def send_organization_invite_email(inviter: str, invitee: str, organization_name: str, role: str) -> None:
+    send_template_email(
+        invitee,
+        EMAIL_TEMPLATE_ORGANIZATION_INVITE,
+        {"INVITER": inviter, "ORGANIZATION_NAME": organization_name, "ROLE": role},
+    )
+
+
+def send_template_email(to: str, template: str, variables: dict[str, str | int]) -> None:
     params: resend.Emails.SendParams = {
-        "from": "Deskconn <noreply@deskconn.com>",
-        "to": [user_email],
-        "subject": "Deskconn Verification Code",
-        "text": f"Your verification code is: {code}",
+        "from": EMAIL_FROM,
+        "to": [to],
+        "template": {"id": template, "variables": variables},
     }
 
     thread = threading.Thread(target=send_email, args=(params,))
@@ -145,37 +169,13 @@ def send_user_verification_email(user_email: str, code: str) -> None:
 def send_email(params: resend.Emails.SendParams) -> None:
     if X_DEBUG:
         print("-------------------------------------")
-        print(f"[X_DEBUG] OTP email to {params['to']}: {params['text']}")
+        print(f"[X_DEBUG] {params['template']['id']} email to {params['to']}: {params['template']['variables']}")
         print("-------------------------------------")
         return
     try:
         resend.Emails.send(params)
     except Exception as e:
         print("Failed to send email, reason:", e)
-
-
-def send_desktop_invite_email(inviter: str, invitee: str):
-    params: resend.Emails.SendParams = {
-        "from": "Deskconn <noreply@deskconn.com>",
-        "to": [invitee],
-        "subject": "Desktop Access Invitation",
-        "text": f"You have been invited by {inviter} to access a desktop.",
-    }
-
-    thread = threading.Thread(target=send_email, args=(params,))
-    thread.start()
-
-
-def send_organization_invite_email(inviter: str, invitee: str):
-    params: resend.Emails.SendParams = {
-        "from": "Deskconn <noreply@deskconn.com>",
-        "to": [invitee],
-        "subject": "Organization Invitation",
-        "text": f"You have been invited to join the {inviter}'s organization.",
-    }
-
-    thread = threading.Thread(target=send_email, args=(params,))
-    thread.start()
 
 
 async def call_cloud_router_rpc(session: AsyncSession, uri: str, args: list[Any], error_message: str) -> None:
