@@ -40,8 +40,6 @@ EMAIL_FROM = "Deskconn <noreply@deskconn.com>"
 # Aliases of the Resend templates defined in deskconn/email_templates.py
 EMAIL_TEMPLATE_VERIFICATION_CODE = "deskconn-verification-code"
 EMAIL_TEMPLATE_DESKTOP_INVITE = "deskconn-desktop-invite"
-EMAIL_TEMPLATE_ORGANIZATION_INVITE = "deskconn-organization-invite"
-DEFAULT_DESKCONN_RELEASE_BASE_URL = "https://github.com/xconnio/deskconn/releases/download"
 
 CLOUD_REALM = "io.xconn.deskconn"
 TOPIC_DESKTOP_DETACH = "io.xconn.deskconn.desktop.{machine_id}.detach"
@@ -60,16 +58,6 @@ if not X_DEBUG:
 
 def utcnow():
     return datetime.now(timezone.utc)
-
-
-def release_asset_name(application_name: str, version: str, os_name: str, arch: str) -> str:
-    return f"{application_name}_{version.lstrip('v')}_{os_name}_{arch}.tar.gz"
-
-
-def release_download_url(base_url: str, version: str, application_name: str, os_name: str, arch: str) -> str:
-    asset_name = release_asset_name(application_name, version, os_name, arch)
-
-    return f"{base_url.rstrip('/')}/v{version}/{asset_name}"
 
 
 def hash_password_and_generate_salt(password: str) -> Tuple[str, str]:
@@ -144,14 +132,6 @@ def send_user_verification_email(user_email: str, code: str) -> None:
 def send_desktop_invite_email(inviter: str, invitee: str, desktop_name: str, role: str) -> None:
     send_template_email(
         invitee, EMAIL_TEMPLATE_DESKTOP_INVITE, {"INVITER": inviter, "DESKTOP_NAME": desktop_name, "ROLE": role}
-    )
-
-
-def send_organization_invite_email(inviter: str, invitee: str, organization_name: str, role: str) -> None:
-    send_template_email(
-        invitee,
-        EMAIL_TEMPLATE_ORGANIZATION_INVITE,
-        {"INVITER": inviter, "ORGANIZATION_NAME": organization_name, "ROLE": role},
     )
 
 

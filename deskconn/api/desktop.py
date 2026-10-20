@@ -9,7 +9,6 @@ from deskconn import schemas, uris, models, helpers
 from deskconn.database.database import get_database
 from deskconn.database.backend import user as user_backend
 from deskconn.database.backend import desktop as desktop_backend
-from deskconn.database.backend import organization as organization_backend
 
 component = Component()
 
@@ -162,40 +161,6 @@ async def invite_user(
     return invite
 
 
-@component.register(
-    "io.xconn.deskconn.desktop.access.organization.grant", response_model=schemas.DesktopOrganizationAccessGet
-)
-async def grant_organization_access(
-    rs: schemas.DesktopOrganizationAccessGrant, details: CallDetails, db: AsyncSession = Depends(get_database)
-):
-    db_user = await user_backend.get_user_by_email(db, details.authid)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
-
-    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
-    if db_desktop is None:
-        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
-
-    if db_desktop.user_id != db_user.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can grant access")
-
-    db_organization = await organization_backend.get_organization_by_id(db, rs.organization_id)
-    if db_organization is None:
-        raise ApplicationError(uris.ERROR_ORGANIZATION_NOT_FOUND, f"Organization '{rs.organization_id}' not found")
-
-    if db_organization.owner_id != db_user.id:
-        raise ApplicationError(
-            uris.ERROR_USER_NOT_AUTHORIZED, "Only the organization owner can grant organization access"
-        )
-
-    if await desktop_backend.org_access_exists(db, db_desktop.id, db_organization.id):
-        raise ApplicationError(uris.ERROR_USER_ALREADY_MEMBER, "Organization already has access to this desktop")
-
-    return await desktop_backend.grant_org_access(
-        db, db_desktop.id, db_organization.id, models.DesktopAccessRole.member
-    )
-
-
 @component.register("io.xconn.deskconn.desktop.invitation.inbox.list", response_model=schemas.DesktopInviteInboxGet)
 async def list_inbox_invitations(details: CallDetails, db: AsyncSession = Depends(get_database)):
     db_user = await user_backend.get_user_by_email(db, details.authid)
@@ -322,27 +287,6 @@ async def update_user_access_role(
     return await desktop_backend.update_user_access_role(db, db_access, rs.role)
 
 
-@component.register(
-    "io.xconn.deskconn.desktop.access.organization.update", response_model=schemas.DesktopOrganizationAccessGet
-)
-async def update_org_access_role(
-    rs: schemas.DesktopAccessRoleUpdate, details: CallDetails, db: AsyncSession = Depends(get_database)
-):
-    db_user = await user_backend.get_user_by_email(db, details.authid)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
-
-    db_access = await desktop_backend.get_org_access_by_id(db, rs.access_id)
-    if db_access is None:
-        raise ApplicationError(uris.ERROR_DESKTOP_ACCESS_NOT_FOUND, f"Access record '{rs.access_id}' not found")
-
-    db_desktop = await desktop_backend.get_desktop_by_id(db, db_access.desktop_id)
-    if db_desktop.user_id != db_user.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can change access roles")
-
-    return await desktop_backend.update_org_access_role(db, db_access, rs.role)
-
-
 @component.register("io.xconn.deskconn.desktop.access.user.revoke")
 async def revoke_user_access(
     rs: schemas.DesktopAccessRevoke, details: CallDetails, db: AsyncSession = Depends(get_database)
@@ -363,25 +307,6 @@ async def revoke_user_access(
         raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can revoke access")
 
     await desktop_backend.revoke_user_access(db, db_access)
-
-
-@component.register("io.xconn.deskconn.desktop.access.organization.revoke")
-async def revoke_org_access(
-    rs: schemas.DesktopAccessRevoke, details: CallDetails, db: AsyncSession = Depends(get_database)
-):
-    db_user = await user_backend.get_user_by_email(db, details.authid)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
-
-    db_access = await desktop_backend.get_org_access_by_id(db, rs.access_id)
-    if db_access is None:
-        raise ApplicationError(uris.ERROR_DESKTOP_ACCESS_NOT_FOUND, f"Access record '{rs.access_id}' not found")
-
-    db_desktop = await desktop_backend.get_desktop_by_id(db, db_access.desktop_id)
-    if db_desktop.user_id != db_user.id:
-        raise ApplicationError(uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner can revoke access")
-
-    await desktop_backend.revoke_org_access(db, db_access)
 
 
 @component.register("io.xconn.deskconn.desktop.access.user.list", response_model=schemas.DesktopUserAccessDetailGet)
@@ -406,33 +331,6 @@ async def list_user_accesses(
         )
 
     return await desktop_backend.list_user_accesses(db, db_desktop.id)
-
-
-@component.register(
-    "io.xconn.deskconn.desktop.access.organization.list",
-    response_model=schemas.DesktopOrganizationAccessDetailGet,
-)
-async def list_org_accesses(
-    rs: schemas.DesktopAccessListRequest, details: CallDetails, db: AsyncSession = Depends(get_database)
-):
-    db_user = await user_backend.get_user_by_email(db, details.authid)
-    if db_user is None:
-        raise ApplicationError(uris.ERROR_USER_NOT_FOUND, f"User with authid '{details.authid}' not found")
-
-    db_desktop = await desktop_backend.get_desktop_by_id(db, rs.desktop_id)
-    if db_desktop is None:
-        raise ApplicationError(uris.ERROR_DESKTOP_NOT_FOUND, f"Desktop with id '{rs.desktop_id}' not found")
-
-    requester_access = await desktop_backend.get_user_access_by_desktop_and_user(db, db_desktop.id, db_user.id)
-    if requester_access is None or requester_access.role not in (
-        models.DesktopAccessRole.owner,
-        models.DesktopAccessRole.admin,
-    ):
-        raise ApplicationError(
-            uris.ERROR_USER_NOT_AUTHORIZED, "Only the desktop owner or admin can view the access list"
-        )
-
-    return await desktop_backend.list_org_accesses(db, db_desktop.id)
 
 
 @component.register("io.xconn.deskconn.desktop.access.key.list")
