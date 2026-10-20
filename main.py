@@ -6,7 +6,6 @@ from deskconn.api.user import component as user_component
 from deskconn.api.device import component as device_component
 from deskconn.api.desktop import component as desktop_component
 from deskconn.api.principal import component as principal_component
-from deskconn.api.organization import component as organization_component
 from deskconn.api.update import component as update_component
 
 
@@ -19,6 +18,5 @@ app.include_component(auth_component)
 app.include_component(device_component)
 app.include_component(desktop_component)
 app.include_component(principal_component)
-app.include_component(organization_component)
 app.include_component(update_component)
 app.set_schema_procedure("io.xconn.deskconn.account.schema.get")

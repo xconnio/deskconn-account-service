@@ -40,7 +40,6 @@ EMAIL_FROM = "Deskconn <noreply@deskconn.com>"
 # Aliases of the Resend templates defined in deskconn/email_templates.py
 EMAIL_TEMPLATE_VERIFICATION_CODE = "deskconn-verification-code"
 EMAIL_TEMPLATE_DESKTOP_INVITE = "deskconn-desktop-invite"
-EMAIL_TEMPLATE_ORGANIZATION_INVITE = "deskconn-organization-invite"
 DEFAULT_DESKCONN_RELEASE_BASE_URL = "https://github.com/xconnio/deskconn/releases/download"
 
 CLOUD_REALM = "io.xconn.deskconn"
@@ -144,14 +143,6 @@ def send_user_verification_email(user_email: str, code: str) -> None:
 def send_desktop_invite_email(inviter: str, invitee: str, desktop_name: str, role: str) -> None:
     send_template_email(
         invitee, EMAIL_TEMPLATE_DESKTOP_INVITE, {"INVITER": inviter, "DESKTOP_NAME": desktop_name, "ROLE": role}
-    )
-
-
-def send_organization_invite_email(inviter: str, invitee: str, organization_name: str, role: str) -> None:
-    send_template_email(
-        invitee,
-        EMAIL_TEMPLATE_ORGANIZATION_INVITE,
-        {"INVITER": inviter, "ORGANIZATION_NAME": organization_name, "ROLE": role},
     )
 
 

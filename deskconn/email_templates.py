@@ -8,7 +8,6 @@ import resend
 from deskconn.helpers import (
     EMAIL_FROM,
     EMAIL_TEMPLATE_DESKTOP_INVITE,
-    EMAIL_TEMPLATE_ORGANIZATION_INVITE,
     EMAIL_TEMPLATE_VERIFICATION_CODE,
 )
 
@@ -74,25 +73,6 @@ TEMPLATES: list[resend.Templates.CreateParams] = [
         "variables": [
             {"key": "INVITER", "type": "string"},
             {"key": "DESKTOP_NAME", "type": "string", "fallback_value": "a desktop"},
-            {"key": "ROLE", "type": "string", "fallback_value": "member"},
-        ],
-    },
-    {
-        "name": "Deskconn Organization Invite",
-        "alias": EMAIL_TEMPLATE_ORGANIZATION_INVITE,
-        "from": EMAIL_FROM,
-        "subject": "{{{INVITER}}} invited you to join {{{ORGANIZATION_NAME}}} on Deskconn",
-        "html": _layout(
-            "You've been invited to an organization",
-            f"""<p {_P}><strong>{{{{{{INVITER}}}}}}</strong> has invited you to join the organization
-          <strong>{{{{{{ORGANIZATION_NAME}}}}}}</strong> as <strong>{{{{{{ROLE}}}}}}</strong>.</p>
-          <p {_P}>Open the Deskconn app and sign in with this email address to accept or decline the invitation.</p>""",
-        ),
-        "text": "{{{INVITER}}} has invited you to join the organization {{{ORGANIZATION_NAME}}} as {{{ROLE}}}.\n\n"
-        "Open the Deskconn app and sign in with this email address to accept or decline the invitation.",
-        "variables": [
-            {"key": "INVITER", "type": "string"},
-            {"key": "ORGANIZATION_NAME", "type": "string", "fallback_value": "an organization"},
             {"key": "ROLE", "type": "string", "fallback_value": "member"},
         ],
     },

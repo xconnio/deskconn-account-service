@@ -8,12 +8,6 @@ from sqlalchemy import select, exists, Sequence, delete, union_all, func
 
 from deskconn import models, schemas, helpers
 
-_ROLE_PRIORITY = {
-    models.DesktopAccessRole.owner: 3,
-    models.DesktopAccessRole.admin: 2,
-    models.DesktopAccessRole.member: 1,
-}
-
 
 async def create_desktop(
     db: AsyncSession,
@@ -46,18 +40,7 @@ async def desktop_name_unique_for_user(db: AsyncSession, name: str, user_id: UUI
 
 
 async def get_user_desktops(db: AsyncSession, user_id: UUID, name: str | None = None) -> Sequence[models.Desktop]:
-    accessible_ids = (
-        select(models.DesktopUserAccess.desktop_id)
-        .where(models.DesktopUserAccess.user_id == user_id)
-        .union(
-            select(models.DesktopOrganizationAccess.desktop_id)
-            .join(
-                models.OrganizationMember,
-                models.OrganizationMember.organization_id == models.DesktopOrganizationAccess.organization_id,
-            )
-            .where(models.OrganizationMember.user_id == user_id)
-        )
-    )
+    accessible_ids = select(models.DesktopUserAccess.desktop_id).where(models.DesktopUserAccess.user_id == user_id)
 
     stmt = select(models.Desktop).where(models.Desktop.id.in_(accessible_ids))
 
@@ -77,38 +60,20 @@ async def get_user_desktops_authid_with_authrole(
 
 
 async def get_user_desktops_with_role(db: AsyncSession, user_id: UUID, name: str | None = None) -> list[models.Desktop]:
-    direct = select(
-        models.DesktopUserAccess.desktop_id.label("desktop_id"),
-        models.DesktopUserAccess.role.label("role"),
-    ).where(models.DesktopUserAccess.user_id == user_id)
-
-    via_org = (
-        select(
-            models.DesktopOrganizationAccess.desktop_id.label("desktop_id"),
-            models.DesktopOrganizationAccess.role.label("role"),
-        )
-        .join(
-            models.OrganizationMember,
-            models.OrganizationMember.organization_id == models.DesktopOrganizationAccess.organization_id,
-        )
-        .where(models.OrganizationMember.user_id == user_id)
+    stmt = (
+        select(models.Desktop, models.DesktopUserAccess.role)
+        .join(models.DesktopUserAccess, models.DesktopUserAccess.desktop_id == models.Desktop.id)
+        .where(models.DesktopUserAccess.user_id == user_id)
     )
-
-    all_roles = union_all(direct, via_org).subquery()
-
-    stmt = select(models.Desktop, all_roles.c.role).join(all_roles, all_roles.c.desktop_id == models.Desktop.id)
     if name is not None:
         stmt = stmt.where(models.Desktop.name == name)
 
-    best: dict[UUID, tuple[models.Desktop, models.DesktopAccessRole]] = {}
+    desktops = []
     for desktop, role in (await db.execute(stmt)).all():
-        if desktop.id not in best or _ROLE_PRIORITY[role] > _ROLE_PRIORITY[best[desktop.id][1]]:
-            best[desktop.id] = (desktop, role)
-
-    for desktop, role in best.values():
         desktop.role = role
+        desktops.append(desktop)
 
-    return [desktop for desktop, _ in best.values()]
+    return desktops
 
 
 async def get_user_desktop_by_id(db: AsyncSession, desktop_id: UUID, db_user: models.User) -> models.Desktop | None:
@@ -224,58 +189,13 @@ async def revoke_user_access(db: AsyncSession, db_access: models.DesktopUserAcce
     await db.commit()
 
 
-async def org_access_exists(db: AsyncSession, desktop_id: UUID, organization_id: UUID) -> bool:
-    stmt = select(
-        exists()
-        .where(models.DesktopOrganizationAccess.desktop_id == desktop_id)
-        .where(models.DesktopOrganizationAccess.organization_id == organization_id)
-    )
-    result = await db.execute(stmt)
-
-    return bool(result.scalar())
-
-
-async def grant_org_access(
-    db: AsyncSession, desktop_id: UUID, organization_id: UUID, role: models.DesktopAccessRole
-) -> models.DesktopOrganizationAccess:
-    db_access = models.DesktopOrganizationAccess(desktop_id=desktop_id, organization_id=organization_id, role=role)
-    db.add(db_access)
-    await db.commit()
-    await db.refresh(db_access)
-
-    return db_access
-
-
-async def get_org_access_by_id(db: AsyncSession, access_id: UUID) -> models.DesktopOrganizationAccess | None:
-    stmt = select(models.DesktopOrganizationAccess).where(models.DesktopOrganizationAccess.id == access_id)
-    result = await db.execute(stmt)
-
-    return result.scalar()
-
-
-async def update_org_access_role(
-    db: AsyncSession, db_access: models.DesktopOrganizationAccess, role: models.DesktopAccessRole
-) -> models.DesktopOrganizationAccess:
-    db_access.role = role
-    await db.commit()
-    await db.refresh(db_access)
-
-    return db_access
-
-
-async def revoke_org_access(db: AsyncSession, db_access: models.DesktopOrganizationAccess) -> None:
-    await db.delete(db_access)
-    await db.commit()
-
-
 async def create_desktop_invite(
     db: AsyncSession,
     inviter: models.User,
     desktop: models.Desktop,
     role: models.DesktopAccessRole,
     expires_in_hours: int,
-    invitee_user: models.User | None = None,
-    invitee_organization: models.Organization | None = None,
+    invitee_user: models.User,
 ) -> models.DesktopInvite:
     db_invite = models.DesktopInvite(
         desktop_id=desktop.id,
@@ -283,8 +203,7 @@ async def create_desktop_invite(
         role=role,
         status=models.InvitationStatus.pending,
         expires_at=helpers.utcnow() + timedelta(hours=expires_in_hours),
-        invitee_user_id=invitee_user.id if invitee_user else None,
-        invitee_organization_id=invitee_organization.id if invitee_organization else None,
+        invitee_user_id=invitee_user.id,
     )
 
     db.add(db_invite)
@@ -315,20 +234,6 @@ async def get_pending_user_invite(
     return result.scalar()
 
 
-async def get_pending_org_invite(
-    db: AsyncSession, desktop_id: UUID, organization_id: UUID
-) -> models.DesktopInvite | None:
-    stmt = select(models.DesktopInvite).where(
-        models.DesktopInvite.desktop_id == desktop_id,
-        models.DesktopInvite.invitee_organization_id == organization_id,
-        models.DesktopInvite.status == models.InvitationStatus.pending,
-        models.DesktopInvite.expires_at > helpers.utcnow(),
-    )
-    result = await db.execute(stmt)
-
-    return result.scalar()
-
-
 async def change_desktop_invite_status(
     db: AsyncSession, invite: models.DesktopInvite, status: models.InvitationStatus
 ) -> None:
@@ -350,23 +255,8 @@ async def respond_to_desktop_user_invite(
     return None
 
 
-async def respond_to_desktop_org_invite(
-    db: AsyncSession, invite: models.DesktopInvite, status: models.InvitationStatus
-) -> models.DesktopOrganizationAccess | None:
-    await change_desktop_invite_status(db, invite, status)
-
-    if status == models.InvitationStatus.accepted:
-        invite.accepted_at = helpers.utcnow()
-        await db.commit()
-
-        return await grant_org_access(db, invite.desktop_id, invite.invitee_organization_id, invite.role)
-
-    return None
-
-
 async def list_desktop_invites_inbox(db: AsyncSession, user: models.User) -> Sequence[models.DesktopInvite]:
-    """Returns pending user invites for the given user plus pending org invites for orgs they own."""
-    user_invites_stmt = (
+    stmt = (
         select(models.DesktopInvite)
         .options(joinedload(models.DesktopInvite.desktop))
         .where(
@@ -375,20 +265,9 @@ async def list_desktop_invites_inbox(db: AsyncSession, user: models.User) -> Seq
         )
     )
 
-    owned_org_ids = select(models.Organization.id).where(models.Organization.owner_id == user.id)
-    org_invites_stmt = (
-        select(models.DesktopInvite)
-        .options(joinedload(models.DesktopInvite.desktop))
-        .where(
-            models.DesktopInvite.invitee_organization_id.in_(owned_org_ids),
-            models.DesktopInvite.status == models.InvitationStatus.pending,
-        )
-    )
+    result = await db.execute(stmt)
 
-    user_result = await db.execute(user_invites_stmt)
-    org_result = await db.execute(org_invites_stmt)
-
-    return list(user_result.scalars().unique().all()) + list(org_result.scalars().unique().all())
+    return result.scalars().unique().all()
 
 
 async def list_desktop_invites_outbox(db: AsyncSession, user: models.User) -> Sequence[models.DesktopInvite]:
@@ -423,26 +302,11 @@ async def cancel_desktop_invite(db: AsyncSession, invite: models.DesktopInvite) 
 
 
 async def get_desktop_access_public_keys(db: AsyncSession, desktop_id: UUID) -> list[dict[str, Any]]:
-    direct_users = (
+    base_users = (
         select(models.DesktopUserAccess.user_id.label("user_id"), models.DesktopUserAccess.role.label("authrole"))
         .where(models.DesktopUserAccess.desktop_id == desktop_id)
         .subquery()
     )
-
-    org_users = (
-        select(
-            models.OrganizationMember.user_id.label("user_id"),
-            models.DesktopOrganizationAccess.role.label("authrole"),
-        )
-        .join(
-            models.DesktopOrganizationAccess,
-            models.DesktopOrganizationAccess.organization_id == models.OrganizationMember.organization_id,
-        )
-        .where(models.DesktopOrganizationAccess.desktop_id == desktop_id)
-        .subquery()
-    )
-
-    base_users = union_all(select(direct_users), select(org_users)).subquery()
 
     principal_query = (
         select(
@@ -476,8 +340,6 @@ async def get_desktop_access_public_keys(db: AsyncSession, desktop_id: UUID) -> 
                 "authorized_keys": [],
                 "authrole": authrole,
             }
-        elif _ROLE_PRIORITY.get(authrole, 0) > _ROLE_PRIORITY.get(desktop_authorizations[authid]["authrole"], 0):
-            desktop_authorizations[authid]["authrole"] = authrole
 
         desktop_authorizations[authid]["authorized_keys"].append(public_key)
 
@@ -485,27 +347,12 @@ async def get_desktop_access_public_keys(db: AsyncSession, desktop_id: UUID) -> 
 
 
 async def has_desktop_access(db: AsyncSession, desktop_id: UUID, user_id: UUID) -> bool:
-    direct = select(
+    stmt = select(
         exists()
         .where(models.DesktopUserAccess.desktop_id == desktop_id)
         .where(models.DesktopUserAccess.user_id == user_id)
     )
-    result = await db.execute(direct)
-    if result.scalar():
-        return True
-
-    via_org = select(
-        exists(
-            select(models.DesktopOrganizationAccess.id)
-            .join(
-                models.OrganizationMember,
-                models.OrganizationMember.organization_id == models.DesktopOrganizationAccess.organization_id,
-            )
-            .where(models.DesktopOrganizationAccess.desktop_id == desktop_id)
-            .where(models.OrganizationMember.user_id == user_id)
-        )
-    )
-    result = await db.execute(via_org)
+    result = await db.execute(stmt)
 
     return bool(result.scalar())
 
@@ -525,16 +372,6 @@ async def list_user_accesses(db: AsyncSession, desktop_id: UUID) -> Sequence[mod
         select(models.DesktopUserAccess)
         .options(joinedload(models.DesktopUserAccess.user))
         .where(models.DesktopUserAccess.desktop_id == desktop_id)
-    )
-    result = await db.execute(stmt)
-    return result.scalars().unique().all()
-
-
-async def list_org_accesses(db: AsyncSession, desktop_id: UUID) -> Sequence[models.DesktopOrganizationAccess]:
-    stmt = (
-        select(models.DesktopOrganizationAccess)
-        .options(joinedload(models.DesktopOrganizationAccess.organization))
-        .where(models.DesktopOrganizationAccess.desktop_id == desktop_id)
     )
     result = await db.execute(stmt)
     return result.scalars().unique().all()
